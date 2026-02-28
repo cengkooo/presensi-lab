@@ -71,7 +71,8 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createSupabaseBrowserClient() as any;
 
     const [profRes, enrollRes, attRes] = await Promise.all([
       supabase.from("profiles").select("id, full_name, nim, avatar_url, role").eq("id", userId).single(),
@@ -91,7 +92,7 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
     setProfile(profRes.data as Profile);
 
     // Build per-class attendance counts
-    const attRows = attRes.data ?? [];
+    const attRows = (attRes.data ?? []) as any[];
     const hadirByClass = new Map<string, number>();
     for (const a of attRows) {
       const sess = a.sessions as unknown as { class_id: string };
@@ -100,7 +101,7 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
       }
     }
 
-    const stats: ClassStat[] = (enrollRes.data ?? []).map((row) => {
+    const stats: ClassStat[] = ((enrollRes.data ?? []) as any[]).map((row) => {
       const cls = row.classes as unknown as {
         id: string; code: string; name: string;
         min_attendance_pct: number; total_sessions_planned: number;

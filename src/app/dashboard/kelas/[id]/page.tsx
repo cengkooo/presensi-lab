@@ -1,13 +1,15 @@
 "use client";
 
-import { use, useState, useEffect, useCallback } from "react";
+import { use, useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useToast } from "@/hooks/useToast";
+import { Toast } from "@/components/ui/Toast";
 import {
   ChevronLeft, FlaskConical, Users, Plus, X,
   CheckCircle, Radio, Clock, CalendarDays, MapPin, RefreshCw,
+  Edit2, Trash2, ZapOff,
 } from "lucide-react";
-
-const PAGE = "kelas-detail";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface SessionItem {
   id: string;
@@ -35,6 +37,16 @@ interface ClassDetail {
   enrollment_count: number;
   my_peran: string | null;
 }
+
+interface EnrollmentItem {
+  id: string;
+  peran: string;
+  joined_at: string;
+  profiles: { id: string; full_name: string | null; nim: string | null; avatar_url: string | null; role: string } | null;
+}
+
+// userId -> sessionId -> status
+type AttendanceMatrix = Record<string, Record<string, string>>;
 
 type SessionStatusType = "active" | "done" | "upcoming";
 
@@ -131,12 +143,220 @@ function CreateSessionModal({
   );
 }
 
+function EditSessionModal({
+  sess, onClose, onSuccess,
+}: {
+  sess: SessionItem;
+  onClose: () => void;
+  onSuccess: (updated: SessionItem) => void;
+}) {
+  const [form, setForm] = useState({
+    title: sess.title,
+    description: sess.description ?? "",
+    session_date: sess.session_date,
+    location: sess.location ?? "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    if (!form.title.trim() || !form.session_date) { setError("Judul dan tanggal sesi wajib diisi."); return; }
+    setSubmitting(true); setError("");
+    const res = await fetch(`/api/sessions/${sess.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: form.title.trim(), description: form.description.trim() || null, session_date: form.session_date, location: form.location.trim() || null }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setError(json.message ?? "Gagal memperbarui sesi."); setSubmitting(false); return; }
+    onSuccess(json.data as SessionItem);
+    onClose();
+  };
+
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)", padding: "16px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, borderRadius: "20px", padding: "24px", background: "rgba(8,24,20,0.99)", border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 0 60px rgba(16,185,129,0.12)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#f0fdf4" }}>Edit Sesi</h3>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(110,231,183,0.4)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={13} /></button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Judul Sesi *</label>
+            <input className="input-glass" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Tanggal Sesi *</label>
+            <input className="input-glass" type="date" value={form.session_date} onChange={(e) => setForm((f) => ({ ...f, session_date: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Lokasi</label>
+            <input className="input-glass" placeholder="cth: Lab Komputer A" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Deskripsi</label>
+            <input className="input-glass" placeholder="Opsional" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          </div>
+          {error && <p style={{ fontSize: "12px", color: "#f87171", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", padding: "8px 12px" }}>{error}</p>}
+        </div>
+        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+          <button onClick={onClose} className="btn-ghost flex-1 rounded-xl" style={{ padding: "10px" }}>Batal</button>
+          <button onClick={handleSubmit} disabled={submitting} className="btn-primary flex-1 rounded-xl" style={{ gap: "8px", padding: "10px", opacity: submitting ? 0.6 : 1 }}>
+            {submitting ? "Menyimpan..." : "Simpan Perubahan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteSessionModal({
+  sess, onClose, onSuccess,
+}: {
+  sess: SessionItem;
+  onClose: () => void;
+  onSuccess: (id: string) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDelete = async () => {
+    setDeleting(true); setError("");
+    const res = await fetch(`/api/sessions/${sess.id}`, { method: "DELETE" });
+    const json = await res.json();
+    if (!res.ok) { setError(json.message ?? "Gagal menghapus sesi."); setDeleting(false); return; }
+    onSuccess(sess.id);
+    onClose();
+  };
+
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)", padding: "16px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, borderRadius: "20px", padding: "24px", background: "rgba(8,24,20,0.99)", border: "1px solid rgba(239,68,68,0.25)", boxShadow: "0 0 60px rgba(239,68,68,0.1)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+          <div style={{ width: 40, height: 40, borderRadius: "12px", background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Trash2 size={18} style={{ color: "#f87171" }} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#f0fdf4" }}>Hapus Sesi?</h3>
+            <p style={{ fontSize: "12px", color: "rgba(110,231,183,0.45)", marginTop: "2px" }}>Tindakan ini tidak dapat dibatalkan.</p>
+          </div>
+        </div>
+        <p style={{ fontSize: "13px", color: "rgba(110,231,183,0.6)", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: "10px", padding: "10px 14px", marginBottom: "16px" }}>
+          Sesi <strong style={{ color: "#f0fdf4" }}>{sess.title}</strong> beserta semua data absensinya akan dihapus permanen.
+        </p>
+        {error && <p style={{ fontSize: "12px", color: "#f87171", marginBottom: "12px" }}>{error}</p>}
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button onClick={onClose} className="btn-ghost flex-1 rounded-xl" style={{ padding: "10px" }}>Batal</button>
+          <button onClick={handleDelete} disabled={deleting} style={{ flex: 1, padding: "10px", borderRadius: "12px", background: deleting ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171", fontWeight: 700, fontSize: "13px", cursor: deleting ? "not-allowed" : "pointer", transition: "all 0.15s" }}>
+            {deleting ? "Menghapus..." : "Ya, Hapus Sesi"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeactivateConfirmModal({
+  sess, onClose, onSuccess,
+}: {
+  sess: SessionItem;
+  onClose: () => void;
+  onSuccess: (updated: SessionItem) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleDeactivate = async () => {
+    setLoading(true); setError("");
+    const res = await fetch("/api/sessions/deactivate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sess.id }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setError(json.message ?? "Gagal menonaktifkan sesi."); setLoading(false); return; }
+    onSuccess(json.data as SessionItem);
+    onClose();
+  };
+
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)", padding: "16px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, borderRadius: "20px", padding: "24px", background: "rgba(8,24,20,0.99)", border: "1px solid rgba(234,179,8,0.25)", boxShadow: "0 0 60px rgba(234,179,8,0.08)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+          <div style={{ width: 40, height: 40, borderRadius: "12px", background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <ZapOff size={18} style={{ color: "#facc15" }} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#f0fdf4" }}>Nonaktifkan Sesi?</h3>
+            <p style={{ fontSize: "12px", color: "rgba(110,231,183,0.45)", marginTop: "2px" }}>Absensi akan langsung ditutup.</p>
+          </div>
+        </div>
+        <p style={{ fontSize: "13px", color: "rgba(110,231,183,0.6)", background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.15)", borderRadius: "10px", padding: "10px 14px", marginBottom: "16px" }}>
+          Sesi <strong style={{ color: "#f0fdf4" }}>{sess.title}</strong> sedang LIVE. Menonaktifkan sekarang akan menutup absensi meski waktu belum habis.
+        </p>
+        {error && <p style={{ fontSize: "12px", color: "#f87171", marginBottom: "12px" }}>{error}</p>}
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button onClick={onClose} className="btn-ghost flex-1 rounded-xl" style={{ padding: "10px" }}>Batal</button>
+          <button onClick={handleDeactivate} disabled={loading} style={{ flex: 1, padding: "10px", borderRadius: "12px", background: loading ? "rgba(234,179,8,0.2)" : "rgba(234,179,8,0.12)", border: "1px solid rgba(234,179,8,0.35)", color: "#facc15", fontWeight: 700, fontSize: "13px", cursor: loading ? "not-allowed" : "pointer", transition: "all 0.15s" }}>
+            {loading ? "Menonaktifkan..." : "Ya, Nonaktifkan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableSkeleton({ cols }: { cols: number }) {
+  return (
+    <div style={{ padding: "8px 0" }}>
+      {[1, 2, 3, 4].map((r) => (
+        <div key={r} style={{ display: "flex", gap: "16px", padding: "12px 20px", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+          {Array.from({ length: cols }).map((_, i) => (
+            <div key={i} style={{ height: 14, borderRadius: 6, background: "rgba(16,185,129,0.08)", flex: i === 0 ? 2 : 1, animation: "shimmer 1.5s ease-in-out infinite", animationDelay: `${i * 0.1}s` }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function KelasDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: classId } = use(params);
   const [kelas, setKelas] = useState<ClassDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateSession, setShowCreateSession] = useState(false);
+
+  // Tab state
+  type TabId = "sesi" | "mahasiswa" | "rekap";
+  const [activeTab, setActiveTab] = useState<TabId>("sesi");
+  const [fetchedTabs, setFetchedTabs] = useState<Set<TabId>>(new Set(["sesi"]));
+
+  // Per-tab data
+  const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
+  const [loadingEnrollments, setLoadingEnrollments] = useState(false);
+  const [attendanceMatrix, setAttendanceMatrix] = useState<AttendanceMatrix>({});
+  const [loadingMatrix, setLoadingMatrix] = useState(false);
+
+  // Tab content animation
+  const [tabVisible, setTabVisible] = useState(true);
+
+  // Session action modals
+  const [editingSess, setEditingSess] = useState<SessionItem | null>(null);
+  const [deletingSess, setDeletingSess] = useState<SessionItem | null>(null);
+  const [deactivatingSess, setDeactivatingSess] = useState<SessionItem | null>(null);
+
+  // Kelas Asal — localStorage only, key: kelasAsal_[userId]_[classId]
+  const [kelasAsalMap, setKelasAsalMap] = useState<Record<string, string>>({});
+  const kelasAsalLoaded = useRef(false);
+
+  // Peran update — tracks which enrollmentIds are being saved
+  const [updatingPeranIds, setUpdatingPeranIds] = useState<Set<string>>(new Set());
+
+  // Attendance override — key: "userId_sessionId"
+  const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set());
+
+  const { toasts, toast, dismissToast } = useToast();
 
   const fetchKelas = useCallback(async () => {
     setLoading(true);
@@ -150,9 +370,151 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => { fetchKelas(); }, [fetchKelas]);
 
+  const fetchEnrollments = useCallback(async (kelasData: ClassDetail) => {
+    setLoadingEnrollments(true);
+    const res = await fetch(`/api/classes/${kelasData.id}/enrollments`);
+    if (!res.ok) { setLoadingEnrollments(false); return; }
+    const json = await res.json();
+    setEnrollments(json.data ?? []);
+    setLoadingEnrollments(false);
+  }, []);
+
+  const fetchMatrix = useCallback(async (kelasData: ClassDetail) => {
+    if (!kelasData.sessions.length) return;
+    setLoadingMatrix(true);
+    const sessionIds = kelasData.sessions.map((s) => s.id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = createSupabaseBrowserClient() as any;
+    const { data } = await Promise.resolve(
+      sb.from("attendance")
+        .select("session_id, user_id, status")
+        .in("session_id", sessionIds)
+    ) as { data: { session_id: string; user_id: string; status: string }[] | null };
+    if (data) {
+      const matrix: AttendanceMatrix = {};
+      for (const row of data) {
+        if (!matrix[row.user_id]) matrix[row.user_id] = {};
+        matrix[row.user_id][row.session_id] = row.status;
+      }
+      setAttendanceMatrix(matrix);
+    }
+    setLoadingMatrix(false);
+  }, []);
+
+  const handleTabClick = (tab: "sesi" | "mahasiswa" | "rekap") => {
+    if (tab === activeTab) return;
+    setTabVisible(false);
+    setTimeout(() => {
+      setActiveTab(tab);
+      setTabVisible(true);
+      if (!fetchedTabs.has(tab) && kelas) {
+        setFetchedTabs((prev) => new Set([...prev, tab]));
+        if (tab === "mahasiswa") fetchEnrollments(kelas);
+        if (tab === "rekap") { fetchEnrollments(kelas); fetchMatrix(kelas); }
+      }
+    }, 150);
+  };
+
+  // Load kelasAsal from localStorage once enrollments are available
+  useEffect(() => {
+    if (kelasAsalLoaded.current || enrollments.length === 0 || !kelas) return;
+    kelasAsalLoaded.current = true;
+    const map: Record<string, string> = {};
+    for (const enr of enrollments) {
+      if (!enr.profiles?.id) continue;
+      const stored = localStorage.getItem(`kelasAsal_${enr.profiles.id}_${kelas.id}`);
+      if (stored) map[enr.profiles.id] = stored;
+    }
+    setKelasAsalMap(map);
+  }, [enrollments, kelas]);
+
+  const handleKelasAsalChange = (userId: string, value: string) => {
+    if (!kelas) return;
+    if (value) localStorage.setItem(`kelasAsal_${userId}_${kelas.id}`, value);
+    else localStorage.removeItem(`kelasAsal_${userId}_${kelas.id}`);
+    setKelasAsalMap((prev) => ({ ...prev, [userId]: value }));
+  };
+
+  const handleAttendanceOverride = useCallback(async (
+    userId: string,
+    sessionId: string,
+    newStatus: string,  // "" = hapus record
+    oldStatus: string | undefined,
+  ) => {
+    // Runtime guard — same format-only regex used on the server
+    // (Zod v4 .uuid() rejects non-RFC-4122-version UUIDs, so we use the loose format check)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(userId) || !UUID_RE.test(sessionId)) {
+      console.error("[handleAttendanceOverride] Invalid UUID(s):", { userId, sessionId });
+      toast.error(`Data tidak valid: ID bukan UUID yang valid.`);
+      return;
+    }
+    const key = `${userId}_${sessionId}`;
+    // Optimistic update
+    setAttendanceMatrix((prev) => {
+      const next = { ...prev, [userId]: { ...(prev[userId] ?? {}) } };
+      if (!newStatus) delete next[userId][sessionId];
+      else next[userId][sessionId] = newStatus;
+      return next;
+    });
+    setUpdatingCells((prev) => new Set([...prev, key]));
+
+    const res = await fetch("/api/attendance/override", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, session_id: sessionId, status: newStatus }),
+    });
+    const json = await res.json();
+    setUpdatingCells((prev) => { const n = new Set(prev); n.delete(key); return n; });
+
+    if (!res.ok) {
+      // Revert
+      setAttendanceMatrix((prev) => {
+        const next = { ...prev, [userId]: { ...(prev[userId] ?? {}) } };
+        if (!oldStatus) delete next[userId][sessionId];
+        else next[userId][sessionId] = oldStatus;
+        return next;
+      });
+      toast.error(json.message ?? "Gagal mengubah kehadiran.");
+    }
+  }, [toast]);
+
+  const handlePeranChange = async (enrId: string, newPeran: string, oldPeran: string) => {
+    // Optimistic update
+    setEnrollments((prev) => prev.map((e) => e.id === enrId ? { ...e, peran: newPeran } : e));
+    setUpdatingPeranIds((prev) => new Set([...prev, enrId]));
+    const res = await fetch(`/api/enrollments/${enrId}/peran`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ peran: newPeran }),
+    });
+    const json = await res.json();
+    setUpdatingPeranIds((prev) => { const n = new Set(prev); n.delete(enrId); return n; });
+    if (!res.ok) {
+      // Revert
+      setEnrollments((prev) => prev.map((e) => e.id === enrId ? { ...e, peran: oldPeran } : e));
+      toast.error(json.message ?? "Gagal mengubah peran.");
+    }
+  };
+
   const handleSessionCreated = (sess: SessionItem) => {
     if (!kelas) return;
     setKelas({ ...kelas, sessions: [sess, ...kelas.sessions] });
+  };
+
+  const handleSessionEdited = (updated: SessionItem) => {
+    if (!kelas) return;
+    setKelas({ ...kelas, sessions: kelas.sessions.map((s) => s.id === updated.id ? updated : s) });
+  };
+
+  const handleSessionDeleted = (id: string) => {
+    if (!kelas) return;
+    setKelas({ ...kelas, sessions: kelas.sessions.filter((s) => s.id !== id) });
+  };
+
+  const handleSessionDeactivated = (updated: SessionItem) => {
+    if (!kelas) return;
+    setKelas({ ...kelas, sessions: kelas.sessions.map((s) => s.id === updated.id ? updated : s) });
   };
 
   if (loading) {
@@ -178,6 +540,15 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
   const completedSessions = kelas.sessions.filter((s) => !s.is_active && new Date(s.session_date + "T23:59:59") <= new Date());
   const activeSessions = kelas.sessions.filter((s) => s.is_active);
   const minPct = kelas.min_attendance_pct;
+  const matrixSessions = kelas.sessions.filter((s) => s.is_active || new Date(s.session_date + "T23:59:59") <= new Date());
+
+  const TAB_DEFS: { id: "sesi" | "mahasiswa" | "rekap"; label: string; count?: number }[] = [
+    { id: "sesi", label: "Daftar Sesi", count: kelas.sessions.length },
+    ...(isDosen ? [
+      { id: "mahasiswa" as const, label: "Daftar Mahasiswa", count: kelas.enrollment_count },
+      { id: "rekap" as const, label: "Rekap Presensi" },
+    ] : []),
+  ];
 
   return (
     <div style={{ minHeight: "100vh", padding: "28px 32px 48px", boxSizing: "border-box" }}>
@@ -231,11 +602,6 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
             <button onClick={fetchKelas} style={{ padding: "8px 12px", borderRadius: "10px", background: "transparent", border: "1px solid rgba(16,185,129,0.2)", color: "rgba(110,231,183,0.5)", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
               <RefreshCw size={13} />
             </button>
-            {isDosen && (
-              <button onClick={() => setShowCreateSession(true)} className="btn-primary rounded-xl" style={{ gap: "8px", padding: "10px 16px", fontSize: "13px" }}>
-                <Plus size={14} /> Tambah Sesi
-              </button>
-            )}
           </div>
         </div>
 
@@ -268,62 +634,417 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      {/* Sessions List */}
-      <div className="glass rounded-2xl" style={{ overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(16,185,129,0.1)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h2 style={{ fontSize: "13px", fontWeight: 700, color: "#10B981", letterSpacing: "0.07em" }}>
-            DAFTAR SESI ({kelas.sessions.length})
-          </h2>
+      {/* Tabbed Container */}
+      <div className="glass rounded-2xl" style={{ overflow: "hidden", minHeight: 400 }}>
+        {/* Tab bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(16,185,129,0.1)", padding: "0 20px", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ display: "flex" }}>
+            {TAB_DEFS.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabClick(tab.id)}
+                  style={{
+                    padding: "14px 16px",
+                    fontSize: "13px",
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? "#f0fdf4" : "#86efac",
+                    background: "transparent",
+                    border: "none",
+                    borderBottom: isActive ? "2px solid #22c55e" : "2px solid transparent",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = "#f0fdf4"; (e.currentTarget as HTMLElement).style.background = "rgba(34,197,94,0.06)"; } }}
+                  onMouseLeave={(e) => { if (!isActive) { (e.currentTarget as HTMLElement).style.color = "#86efac"; (e.currentTarget as HTMLElement).style.background = "transparent"; } }}
+                >
+                  {tab.label}
+                  {tab.count !== undefined && (
+                    <span style={{ marginLeft: "6px", fontSize: "11px", padding: "1px 6px", borderRadius: "10px", background: isActive ? "rgba(34,197,94,0.15)" : "rgba(110,231,183,0.08)", color: isActive ? "#4ade80" : "rgba(110,231,183,0.5)", fontWeight: 600 }}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {/* Contextual action button */}
+          {isDosen && activeTab === "sesi" && (
+            <button onClick={() => setShowCreateSession(true)} className="btn-primary rounded-xl" style={{ gap: "8px", padding: "8px 14px", fontSize: "12px" }}>
+              <Plus size={13} /> Tambah Sesi
+            </button>
+          )}
         </div>
 
-        {kelas.sessions.length === 0 ? (
-          <div style={{ padding: "48px 24px", textAlign: "center" }}>
-            <CalendarDays size={36} style={{ color: "rgba(74,222,128,0.2)", margin: "0 auto 12px" }} />
-            <p style={{ color: "rgba(110,231,183,0.4)", fontSize: "14px" }}>
-              Belum ada sesi.{isDosen && <> Klik <strong style={{ color: "#34D399" }}>Tambah Sesi</strong> untuk mulai.</>}
-            </p>
-          </div>
-        ) : (
-          <div>
-            {kelas.sessions.map((sess) => (
-              <Link
-                key={sess.id}
-                href={`/dashboard/kelas/${classId}/sesi/${sess.id}`}
-                style={{ textDecoration: "none", display: "block" }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "16px", padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.15s, box-shadow 0.15s", cursor: "pointer" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(16,185,129,0.04)"; (e.currentTarget as HTMLElement).style.boxShadow = "inset 3px 0 0 #10B981"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-                      <p style={{ fontSize: "13px", fontWeight: 600, color: "#f0fdf4" }}>{sess.title}</p>
-                      <SessionStatusBadge sess={sess} />
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
-                        <CalendarDays size={11} />
-                        {new Date(sess.session_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                      </span>
-                      {sess.location && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
-                          <MapPin size={11} /> {sess.location}
-                        </span>
-                      )}
-                      {sess.is_active && sess.expires_at && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#f87171" }}>
-                          <Clock size={11} /> Berakhir {new Date(sess.expires_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: "12px", color: "rgba(110,231,183,0.3)" }}>→</span>
+        {/* Tab content */}
+        <div style={{ opacity: tabVisible ? 1 : 0, transform: tabVisible ? "translateX(0)" : "translateX(-8px)", transition: "opacity 0.2s cubic-bezier(0.4,0,0.2,1), transform 0.2s cubic-bezier(0.4,0,0.2,1)" }}>
+
+          {/* ── TAB: DAFTAR SESI ── */}
+          {activeTab === "sesi" && (
+            <div>
+              {kelas.sessions.length === 0 ? (
+                <div style={{ padding: "64px 24px", textAlign: "center" }}>
+                  <CalendarDays size={36} style={{ color: "rgba(74,222,128,0.2)", margin: "0 auto 12px" }} />
+                  <p style={{ color: "rgba(110,231,183,0.4)", fontSize: "14px" }}>
+                    Belum ada sesi.{isDosen && <> Klik <strong style={{ color: "#34D399" }}>+ Tambah Sesi</strong> di atas untuk mulai.</>}
+                  </p>
                 </div>
-              </Link>
-            ))}
-          </div>
-        )}
+              ) : (
+                <div>
+                  {kelas.sessions.map((sess) => (
+                    <div
+                      key={sess.id}
+                      style={{
+                        display: "flex", alignItems: "stretch",
+                        borderBottom: "1px solid rgba(255,255,255,0.04)",
+                        borderLeft: sess.is_active ? "3px solid #ef4444" : "3px solid transparent",
+                        background: sess.is_active ? "rgba(239,68,68,0.04)" : "transparent",
+                      }}
+                    >
+                      {/* Clickable info area → detail page */}
+                      <Link href={`/dashboard/kelas/${classId}/sesi/${sess.id}`} style={{ textDecoration: "none", flex: 1, display: "block" }}>
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: "16px", padding: "14px 16px 14px 20px", height: "100%", boxSizing: "border-box", cursor: "pointer", transition: "background 0.15s" }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = sess.is_active ? "rgba(239,68,68,0.06)" : "rgba(16,185,129,0.04)"; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                              <p style={{ fontSize: "13px", fontWeight: 600, color: "#f0fdf4" }}>{sess.title}</p>
+                              <SessionStatusBadge sess={sess} />
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                              <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
+                                <CalendarDays size={11} />
+                                {new Date(sess.session_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                              </span>
+                              {sess.location && (
+                                <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
+                                  <MapPin size={11} /> {sess.location}
+                                </span>
+                              )}
+                              {sess.is_active && sess.expires_at && (
+                                <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#f87171" }}>
+                                  <Clock size={11} /> Berakhir {new Date(sess.expires_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: "12px", color: "rgba(110,231,183,0.25)", flexShrink: 0 }}>→</span>
+                        </div>
+                      </Link>
+
+                      {/* Action buttons — only for dosen/asisten */}
+                      {isDosen && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "2px", padding: "0 10px", borderLeft: "1px solid rgba(16,185,129,0.07)", flexShrink: 0 }}>
+                          {sess.is_active && (
+                            <button
+                              title="Nonaktifkan sesi"
+                              onClick={() => setDeactivatingSess(sess)}
+                              style={{ width: 30, height: 30, borderRadius: "8px", background: "transparent", border: "none", color: "#facc15", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(234,179,8,0.12)"; }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                            >
+                              <ZapOff size={13} />
+                            </button>
+                          )}
+                          <button
+                            title="Edit sesi"
+                            onClick={() => setEditingSess(sess)}
+                            style={{ width: 30, height: 30, borderRadius: "8px", background: "transparent", border: "none", color: "rgba(110,231,183,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(16,185,129,0.1)"; (e.currentTarget as HTMLElement).style.color = "#34D399"; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "rgba(110,231,183,0.5)"; }}
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            title={sess.is_active ? "Nonaktifkan sesi sebelum menghapus" : "Hapus sesi"}
+                            onClick={() => !sess.is_active && setDeletingSess(sess)}
+                            disabled={sess.is_active}
+                            style={{ width: 30, height: 30, borderRadius: "8px", background: "transparent", border: "none", color: sess.is_active ? "rgba(239,68,68,0.2)" : "rgba(248,113,113,0.5)", cursor: sess.is_active ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" }}
+                            onMouseEnter={(e) => { if (!sess.is_active) { (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.1)"; (e.currentTarget as HTMLElement).style.color = "#f87171"; } }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = sess.is_active ? "rgba(239,68,68,0.2)" : "rgba(248,113,113,0.5)"; }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB: DAFTAR MAHASISWA ── */}
+          {activeTab === "mahasiswa" && (
+            <div>
+              {loadingEnrollments ? (
+                <TableSkeleton cols={5} />
+              ) : enrollments.length === 0 ? (
+                <div style={{ padding: "64px 24px", textAlign: "center" }}>
+                  <Users size={36} style={{ color: "rgba(74,222,128,0.2)", margin: "0 auto 12px" }} />
+                  <p style={{ fontSize: "14px", color: "rgba(110,231,183,0.4)" }}>Belum ada mahasiswa terdaftar di kelas ini.</p>
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(16,185,129,0.12)" }}>
+                      {["No", "Nama", "NIM", "Kelas Asal", "Peran"].map((h) => (
+                        <th key={h} style={{ padding: "11px 16px", textAlign: h === "No" ? "center" : "left", fontWeight: 700, fontSize: "11px", color: "rgba(110,231,183,0.5)", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enrollments.map((enr, i) => {
+                      const p = enr.profiles;
+                      const initials = (p?.full_name ?? "?").split(" ").map((w) => w[0] ?? "").join("").slice(0, 2).toUpperCase();
+                      const userId = p?.id ?? "";
+                      const kelasAsal = userId ? (kelasAsalMap[userId] ?? "") : "";
+                      const isUpdatingPeran = updatingPeranIds.has(enr.id);
+                      // Only dosen (not asisten) can edit peran
+                      const canEditPeran = kelas.my_peran === "dosen";
+                      const peranColors: Record<string, { color: string; bg: string }> = {
+                        mahasiswa: { color: "#34D399", bg: "rgba(16,185,129,0.08)" },
+                        asisten:   { color: "#60a5fa", bg: "rgba(59,130,246,0.1)" },
+                        dosen:     { color: "#facc15", bg: "rgba(234,179,8,0.1)" },
+                      };
+                      const pc = peranColors[enr.peran] ?? peranColors.mahasiswa;
+                      return (
+                        <tr key={enr.id}
+                          style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "background 0.12s" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(16,185,129,0.04)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+
+                          {/* No */}
+                          <td style={{ padding: "11px 16px", textAlign: "center", color: "rgba(110,231,183,0.3)", fontSize: "12px", width: 40 }}>{i + 1}</td>
+
+                          {/* Nama */}
+                          <td style={{ padding: "11px 16px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, color: "#34D399", flexShrink: 0 }}>{initials}</div>
+                              <span style={{ fontWeight: 600, color: "#f0fdf4" }}>{p?.full_name ?? "—"}</span>
+                            </div>
+                          </td>
+
+                          {/* NIM */}
+                          <td style={{ padding: "11px 16px", color: "rgba(110,231,183,0.55)", fontSize: "12px" }}>{p?.nim ?? "—"}</td>
+
+                          {/* Kelas Asal — localStorage only */}
+                          <td style={{ padding: "11px 16px" }}>
+                            {isDosen ? (
+                              <select
+                                value={kelasAsal}
+                                onChange={(e) => userId && handleKelasAsalChange(userId, e.target.value)}
+                                style={{
+                                  appearance: "none" as React.CSSProperties["appearance"],
+                                  WebkitAppearance: "none" as React.CSSProperties["WebkitAppearance"],
+                                  background: kelasAsal ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)",
+                                  border: kelasAsal ? "1px solid rgba(74,222,128,0.35)" : "1px solid rgba(255,255,255,0.1)",
+                                  borderRadius: "8px",
+                                  padding: "4px 28px 4px 10px",
+                                  color: kelasAsal ? "#4ade80" : "rgba(110,231,183,0.35)",
+                                  fontSize: "12px",
+                                  fontWeight: kelasAsal ? 700 : 400,
+                                  cursor: "pointer",
+                                  outline: "none",
+                                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%234ade80' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundPosition: "right 8px center",
+                                  minWidth: 80,
+                                }}
+                              >
+                                <option value="">— Pilih —</option>
+                                {["RA","RB","RC","RD","RE","RF","RG"].map((k) => (
+                                  <option key={k} value={k}>{k}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span style={{ fontSize: "11px", color: kelasAsal ? "#4ade80" : "rgba(110,231,183,0.3)", fontWeight: kelasAsal ? 700 : 400 }}>{kelasAsal || "—"}</span>
+                            )}
+                          </td>
+
+                          {/* Peran */}
+                          <td style={{ padding: "11px 16px" }}>
+                            {isUpdatingPeran ? (
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid rgba(34,197,94,0.3)", borderTopColor: "#34D399", animation: "spin 0.6s linear infinite", display: "inline-block" }} />
+                            ) : canEditPeran ? (
+                              <select
+                                value={enr.peran}
+                                onChange={(e) => handlePeranChange(enr.id, e.target.value, enr.peran)}
+                                style={{
+                                  appearance: "none" as React.CSSProperties["appearance"],
+                                  WebkitAppearance: "none" as React.CSSProperties["WebkitAppearance"],
+                                  background: pc.bg,
+                                  border: `1px solid ${pc.color}40`,
+                                  borderRadius: "8px",
+                                  padding: "4px 28px 4px 10px",
+                                  color: pc.color,
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  outline: "none",
+                                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='${encodeURIComponent(pc.color)}' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundPosition: "right 8px center",
+                                  minWidth: 100,
+                                }}
+                              >
+                                <option value="mahasiswa">mahasiswa</option>
+                                <option value="asisten">asisten</option>
+                                <option value="dosen">dosen</option>
+                              </select>
+                            ) : (
+                              <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: pc.bg, color: pc.color, border: `1px solid ${pc.color}40`, fontWeight: 600 }}>{enr.peran}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB: REKAP PRESENSI ── */}
+          {activeTab === "rekap" && (
+            <div>
+              {loadingMatrix || loadingEnrollments ? (
+                <TableSkeleton cols={5} />
+              ) : matrixSessions.length === 0 ? (
+                <div style={{ padding: "64px 24px", textAlign: "center" }}>
+                  <CheckCircle size={36} style={{ color: "rgba(74,222,128,0.2)", margin: "0 auto 12px" }} />
+                  <p style={{ fontSize: "14px", color: "rgba(110,231,183,0.4)" }}>Belum ada sesi yang selesai untuk ditampilkan.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid rgba(16,185,129,0.12)", background: "rgba(8,24,20,0.98)" }}>
+                        <th style={{ padding: "11px 16px", textAlign: "left", fontWeight: 700, color: "rgba(110,231,183,0.5)", fontSize: "11px", position: "sticky", left: 0, background: "rgba(8,24,20,0.98)", minWidth: 180, zIndex: 2 }}>NAMA</th>
+                        {matrixSessions.map((s, i) => (
+                          <th key={s.id} title={`${s.title} — ${new Date(s.session_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`}
+                            style={{ padding: "11px 8px", textAlign: "center", fontWeight: 700, color: "rgba(110,231,183,0.5)", fontSize: "11px", whiteSpace: "nowrap", minWidth: 52, cursor: "default" }}>
+                            S{i + 1}
+                          </th>
+                        ))}
+                        <th style={{ padding: "11px 14px", textAlign: "center", fontWeight: 700, color: "rgba(110,231,183,0.5)", fontSize: "11px", position: "sticky", right: 0, background: "rgba(8,24,20,0.98)", minWidth: 56, zIndex: 2 }}>%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enrollments.map((enr) => {
+                        const uid = enr.profiles?.id ?? null; // always string | null — never undefined
+                        const userMatrix = uid ? (attendanceMatrix[uid] ?? {}) : {};
+                        const attended = matrixSessions.filter((s) => { const st = userMatrix[s.id]; return st === "hadir" || st === "telat"; }).length;
+                        const pct = matrixSessions.length > 0 ? Math.round((attended / matrixSessions.length) * 100) : 0;
+                        const pctColor = pct >= minPct ? "#34D399" : pct >= minPct - 15 ? "#facc15" : "#f87171";
+                        const belowMin = pct < minPct;
+                        return (
+                          <tr key={enr.id}
+                            style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", background: belowMin ? "rgba(239,68,68,0.03)" : "transparent", transition: "background 0.12s" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = belowMin ? "rgba(239,68,68,0.07)" : "rgba(16,185,129,0.04)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = belowMin ? "rgba(239,68,68,0.03)" : "transparent")}>
+                            <td style={{ padding: "10px 16px", position: "sticky", left: 0, background: "inherit", zIndex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                                {belowMin && <span style={{ fontSize: "12px" }}>⚠️</span>}
+                                <div>
+                                  <p style={{ fontWeight: 600, color: "#f0fdf4", whiteSpace: "nowrap" }}>{enr.profiles?.full_name ?? "—"}</p>
+                                  <p style={{ fontSize: "10px", color: "rgba(110,231,183,0.4)" }}>{enr.profiles?.nim ?? ""}</p>
+                                </div>
+                              </div>
+                            </td>
+                            {matrixSessions.map((s) => {
+                              const status = uid ? userMatrix[s.id] : undefined;
+                              const cellKey = `${uid ?? "nouid"}_${s.id}`;
+                              const isUpdatingCell = updatingCells.has(cellKey);
+
+                              type StatusKey = "hadir" | "telat" | "absen" | "ditolak" | "";
+                              const statusMeta: Record<StatusKey, { sym: string; color: string; bg: string }> = {
+                                hadir:   { sym: "✓", color: "#34D399", bg: "rgba(16,185,129,0.12)" },
+                                telat:   { sym: "~", color: "#facc15", bg: "rgba(234,179,8,0.1)" },
+                                absen:   { sym: "✗", color: "#f87171", bg: "rgba(239,68,68,0.1)" },
+                                ditolak: { sym: "✗", color: "#f87171", bg: "rgba(239,68,68,0.1)" },
+                                "": { sym: "—", color: "rgba(110,231,183,0.3)", bg: "transparent" },
+                              };
+                              const cur = (status ?? "") as StatusKey;
+                              const meta = statusMeta[cur] ?? statusMeta[""];
+
+                              return (
+                                <td key={s.id} style={{ padding: "6px 8px", textAlign: "center" }}>
+                                  {isUpdatingCell ? (
+                                    <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26 }}>
+                                      <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(34,197,94,0.25)", borderTopColor: "#34D399", animation: "spin 0.6s linear infinite" }} />
+                                    </div>
+                                  ) : isDosen && uid !== null ? (
+                                    <select
+                                      value={cur}
+                                      onChange={(e) => handleAttendanceOverride(uid, s.id, e.target.value, status)}
+                                      title={cur ? `Status: ${cur}` : "Belum ada data — klik untuk set"}
+                                      style={{
+                                        appearance: "none" as React.CSSProperties["appearance"],
+                                        WebkitAppearance: "none" as React.CSSProperties["WebkitAppearance"],
+                                        width: 36,
+                                        height: 30,
+                                        borderRadius: "7px",
+                                        background: meta.bg || "rgba(255,255,255,0.04)",
+                                        border: cur ? `1px solid ${meta.color}50` : "1px dashed rgba(110,231,183,0.2)",
+                                        color: meta.color,
+                                        fontSize: "13px",
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        outline: "none",
+                                        textAlign: "center",
+                                        textAlignLast: "center",
+                                        paddingLeft: 2,
+                                        paddingRight: 2,
+                                      }}
+                                    >
+                                      <option value="">—</option>
+                                      <option value="hadir">✓</option>
+                                      <option value="telat">~</option>
+                                      <option value="absen">✗</option>
+                                      <option value="ditolak">✗/D</option>
+                                    </select>
+                                  ) : (
+                                    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "6px", background: meta.bg, color: meta.color, fontWeight: 700, fontSize: "13px" }}>
+                                      {meta.sym}
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td style={{ padding: "8px 14px", textAlign: "center", position: "sticky", right: 0, background: "inherit", zIndex: 1 }}>
+                              <span style={{ fontWeight: 700, fontSize: "12px", color: pctColor }}>{pct}%</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(16,185,129,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                      {([["✓","#34D399","rgba(16,185,129,0.12)","Hadir"],["~","#facc15","rgba(234,179,8,0.1)","Telat"],["✗","#f87171","rgba(239,68,68,0.1)","Absen/Ditolak"],["—","rgba(110,231,183,0.3)","transparent","Belum ada data"]] as const).map(([sym,col,bg,label]) => (
+                        <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "5px", background: bg, color: col, fontWeight: 700, fontSize: "11px" }}>{sym}</span>
+                          <span style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {isDosen && (
+                      <span style={{ fontSize: "11px", color: "rgba(110,231,183,0.35)", fontStyle: "italic" }}>
+                        Klik sel untuk ubah kehadiran secara manual
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
       </div>
 
       {showCreateSession && (
@@ -333,13 +1054,51 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
           onSuccess={handleSessionCreated}
         />
       )}
+      {editingSess && (
+        <EditSessionModal
+          sess={editingSess}
+          onClose={() => setEditingSess(null)}
+          onSuccess={(updated) => { handleSessionEdited(updated); setEditingSess(null); }}
+        />
+      )}
+      {deletingSess && (
+        <DeleteSessionModal
+          sess={deletingSess}
+          onClose={() => setDeletingSess(null)}
+          onSuccess={(id) => { handleSessionDeleted(id); setDeletingSess(null); }}
+        />
+      )}
+      {deactivatingSess && (
+        <DeactivateConfirmModal
+          sess={deactivatingSess}
+          onClose={() => setDeactivatingSess(null)}
+          onSuccess={(updated) => { handleSessionDeactivated(updated); setDeactivatingSess(null); }}
+        />
+      )}
 
       <style>{`
         @keyframes pulse-dot {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(0.8); }
         }
+        @keyframes shimmer {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        select:focus { border-color: rgba(74,222,128,0.5) !important; box-shadow: 0 0 0 3px rgba(34,197,94,0.15) !important; }
+        select option { background: #0a1f1a; color: #f0fdf4; }
       `}</style>
+
+      {/* Toast notifications */}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 100, display: "flex", flexDirection: "column", gap: "8px" }}>
+        {toasts.map((t) => (
+          <Toast key={t.id} id={t.id} message={t.message} type={t.type} onDismiss={dismissToast} />
+        ))}
+      </div>
     </div>
   );
 }

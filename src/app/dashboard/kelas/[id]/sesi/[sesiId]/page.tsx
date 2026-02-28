@@ -56,7 +56,8 @@ export default function SesiDetailPage({ params }: { params: Promise<{ id: strin
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createSupabaseBrowserClient() as any;
 
     const [sessRes, attRes] = await Promise.all([
       supabase

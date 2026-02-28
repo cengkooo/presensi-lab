@@ -81,7 +81,8 @@ function QuickDrawer({
 
   const fetchEnrollments = useCallback(async () => {
     setLoadingEnroll(true);
-    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createSupabaseBrowserClient() as any;
 
     const [enrollRes, attRes] = await Promise.all([
       supabase
@@ -95,8 +96,8 @@ function QuickDrawer({
         .in("status", ["hadir", "telat"]),
     ]);
 
-    const rows = enrollRes.data ?? [];
-    const attRows = attRes.data ?? [];
+    const rows = (enrollRes.data ?? []) as any[];
+    const attRows = (attRes.data ?? []) as any[];
 
     const hadirByClass = new Map<string, number>();
     for (const a of attRows) {
@@ -144,7 +145,8 @@ function QuickDrawer({
 
   const handleEnroll = async (classId: string) => {
     setEnrolling(classId);
-    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createSupabaseBrowserClient() as any;
     await supabase.from("enrollments").insert({ class_id: classId, user_id: user.id, peran: "mahasiswa" });
     setEnrolling(null);
     setShowClassPicker(false);
@@ -307,7 +309,8 @@ export default function MahasiswaPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createSupabaseBrowserClient() as any;
 
     const [profRes, enrollRes] = await Promise.all([
       supabase
