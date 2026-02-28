@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   MapPin,
@@ -216,11 +215,32 @@ function SessionCard({
    MAIN PRESENSI PAGE
    ============================================================ */
 export default function PresensiPage() {
-  const router = useRouter();
   const { user, profile, loading: authLoading } = useSupabaseSession();
 
+  // Dev-only email+password login
+  const [devEmail, setDevEmail] = useState("");
+  const [devPassword, setDevPassword] = useState("");
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
+
+  const handleDevLogin = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDevError(null);
+    setDevLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: devEmail,
+      password: devPassword,
+    });
+    setDevLoading(false);
+    if (error) {
+      setDevError(error.message);
+    }
+    // On success, useSupabaseSession will re-render with user logged in
+  }, [devEmail, devPassword]);
+
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
   const [checkinState, setCheckinState] = useState<CheckinState>("idle");
   const [gpsCoords, setGpsCoords] = useState<GpsCoords | null>(null);
@@ -251,8 +271,6 @@ export default function PresensiPage() {
   // Fetch active session when logged in
   useEffect(() => {
     if (authState !== "logged-in") return;
-
-    setSessionLoading(true);
     fetch("/api/sessions/active", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((json) => {
@@ -374,9 +392,11 @@ export default function PresensiPage() {
   }, [gpsCoords, activeSession, toast]);
 
   const handleLogout = useCallback(async () => {
-    await fetch("/api/auth/signout", { method: "POST" });
-    router.push("/presensi");
-  }, [router]);
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    // onAuthStateChange di AuthContext akan otomatis fire SIGNED_OUT
+    // router.push tidak perlu karena AuthContext re-render ke state "not-logged-in"
+  }, []);
 
   const handleGoogleLogin = useCallback(async () => {
     const supabase = createSupabaseBrowserClient();
@@ -444,6 +464,65 @@ export default function PresensiPage() {
           <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
             Hanya email terdaftar yang dapat masuk
           </p>
+
+          {/* DEV-ONLY: email+password login */}
+          {process.env.NODE_ENV === "development" && (
+            <GlassCard variant="default" className="p-4">
+              <form onSubmit={handleDevLogin} className="space-y-3">
+                <div
+                  className="flex items-center gap-2 text-xs font-semibold"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style={{ background: "rgba(234,179,8,0.15)", color: "#FBBF24" }}
+                  >
+                    DEV
+                  </span>
+                  Login Dummy
+                </div>
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={devEmail}
+                  onChange={(e) => setDevEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={devPassword}
+                  onChange={(e) => setDevPassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                {devError && (
+                  <p className="text-xs" style={{ color: "#F87171" }}>{devError}</p>
+                )}
+                <GlassButton
+                  variant="ghost"
+                  fullWidth
+                  type="submit"
+                  disabled={devLoading}
+                  className="py-2.5 rounded-xl text-sm"
+                >
+                  {devLoading ? "Masuk..." : "Login (Dev)"}
+                </GlassButton>
+              </form>
+            </GlassCard>
+          )}
+
           <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
             Dosen/Asisten?{" "}
             <Link href="/login" className="text-green-400 hover:underline">

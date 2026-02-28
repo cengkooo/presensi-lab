@@ -6,14 +6,25 @@ import { NextRequest, NextResponse } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({ request })
-
-  // Refresh Supabase session — wajib ada agar JWT tidak expired diam-diam
-  const { user } = await updateSession(request, response)
-
   const { pathname } = request.nextUrl
 
-  // ── Proteksi /dashboard/** ───────────────────────────
+  // ── Public routes — SKIP updateSession (tidak perlu auth check, hemat 1 network call) ──
+  // updateSession memanggil getUser() ke server Supabase (~200-500ms) di setiap request.
+  // Public pages tidak membutuhkan ini — auth state dibaca dari localStorage di client.
+  if (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/presensi" ||
+    pathname.startsWith("/api/auth/")
+  ) {
+    return NextResponse.next({ request })
+  }
+
+  // ── Protected routes — perlu verify session ──────────
+  const response = NextResponse.next({ request })
+  const { user } = await updateSession(request, response)
+
+  // Proteksi /dashboard/**
   if (pathname.startsWith("/dashboard")) {
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url))
@@ -21,8 +32,8 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // ── Proteksi /api/** (kecuali /api/auth/**) ──────────
-  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/")) {
+  // Proteksi /api/** (sudah exclude /api/auth/** di atas)
+  if (pathname.startsWith("/api/")) {
     if (!user) {
       return NextResponse.json(
         { success: false, error: "UNAUTHORIZED", message: "Kamu harus login terlebih dahulu." },

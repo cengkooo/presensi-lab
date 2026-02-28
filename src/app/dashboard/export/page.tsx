@@ -94,11 +94,13 @@ export default function ExportPage() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const supabase = createSupabaseBrowserClient() as any;
+
+      // Attendance tidak punya FK langsung ke profiles (FK ke auth.users).
+      // Fetch attendance + sessions terlebih dahulu, lalu fetch profiles terpisah.
       let query = supabase
         .from("attendance")
         .select(`
-          id, status, checked_in_at, distance_meter,
-          profiles ( full_name, nim ),
+          id, user_id, status, checked_in_at, distance_meter,
           sessions!inner ( id, title, location, session_date, class_id,
             classes ( code, name ) )
         `)
@@ -115,13 +117,27 @@ export default function ExportPage() {
         setExporting(false);
         return;
       }
+
+      // Fetch profiles untuk user_id yang ada di data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const uniqueUserIds: string[] = [...new Set<string>((data as any[]).map((r: any) => r.user_id))];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: profilesData } = await (supabase as any)
+        .from("profiles")
+        .select("id, full_name, nim")
+        .in("id", uniqueUserIds);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profileMap: Record<string, { full_name: string; nim: string }> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (profilesData ?? []).forEach((p: any) => { profileMap[p.id] = p; });
+
       const BOM = "\uFEFF";
       const header = ["No", "Nama", "NIM", "Sesi", "Kelas", "Tanggal", "Jam Check-in", "Status", "Jarak (meter)"];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const csvRows = data.map((r: any, i: number) => [
         `"${i + 1}"`,
-        `"${r.profiles?.full_name ?? "-"}"`,
-        `"${r.profiles?.nim ?? "-"}"`,
+        `"${profileMap[r.user_id]?.full_name ?? "-"}"`,
+        `"${profileMap[r.user_id]?.nim ?? "-"}"`,
         `"${r.sessions?.title ?? "-"}"`,
         `"${r.sessions?.classes?.code ?? ""} — ${r.sessions?.classes?.name ?? ""}"`,
         `"${r.sessions?.session_date ?? "-"}"`,

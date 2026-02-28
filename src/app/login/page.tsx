@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
@@ -14,6 +14,29 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading } = useSupabaseSession();
+
+  // Dev-only email+password login
+  const [devEmail, setDevEmail] = useState("");
+  const [devPassword, setDevPassword] = useState("");
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
+
+  const handleDevLogin = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDevError(null);
+    setDevLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: devEmail,
+      password: devPassword,
+    });
+    setDevLoading(false);
+    if (error) {
+      setDevError(error.message);
+    } else {
+      router.replace("/dashboard");
+    }
+  }, [devEmail, devPassword, router]);
 
   // Jika sudah login, langsung ke dashboard
   useEffect(() => {
@@ -111,6 +134,62 @@ export default function LoginPage() {
             >
               Hanya akun dosen dan asisten yang terdaftar yang dapat mengakses dashboard.
             </div>
+
+            {/* DEV-ONLY: email+password login */}
+            {process.env.NODE_ENV === "development" && (
+              <form onSubmit={handleDevLogin} className="space-y-3 pt-2">
+                <div
+                  className="flex items-center gap-2 text-xs font-semibold"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style={{ background: "rgba(234,179,8,0.15)", color: "#FBBF24" }}
+                  >
+                    DEV
+                  </span>
+                  Login Dummy
+                </div>
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={devEmail}
+                  onChange={(e) => setDevEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={devPassword}
+                  onChange={(e) => setDevPassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+                {devError && (
+                  <p className="text-xs" style={{ color: "#F87171" }}>{devError}</p>
+                )}
+                <GlassButton
+                  variant="ghost"
+                  fullWidth
+                  type="submit"
+                  disabled={devLoading}
+                  className="py-2.5 rounded-xl text-sm"
+                >
+                  {devLoading ? "Masuk..." : "Login (Dev)"}
+                </GlassButton>
+              </form>
+            )}
           </div>
         </GlassCard>
 

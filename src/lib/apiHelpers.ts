@@ -59,7 +59,7 @@ export async function getAuthUser() {
 }
 
 // ── Get user role from profiles table ─────────────────
-export async function getUserRole(userId: string): Promise<"mahasiswa" | "dosen" | "admin" | null> {
+export async function getUserRole(userId: string): Promise<"mahasiswa" | "dosen" | "asisten" | "admin" | null> {
   const supabase = await createSupabaseServerClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase as any)
@@ -67,7 +67,7 @@ export async function getUserRole(userId: string): Promise<"mahasiswa" | "dosen"
     .select("role")
     .eq("id", userId)
     .single() as { data: { role: string } | null }
-  return (data?.role as "mahasiswa" | "dosen" | "admin") ?? null
+  return (data?.role as "mahasiswa" | "dosen" | "asisten" | "admin") ?? null
 }
 
 // ── Check if role is staff (dosen / asisten / admin) ─
