@@ -107,12 +107,13 @@ export async function POST(request: NextRequest) {
     // STEP 9b: Handle duplicate check-in (UNIQUE constraint violation)
     if (insertErr.code === "23505") {
       // Ambil data check-in sebelumnya
-      const { data: existing } = await serviceClient
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existing } = await (serviceClient as any)
         .from("attendance")
         .select("checked_in_at, status, distance_meter")
         .eq("session_id", session_id)
         .eq("user_id", user.id)
-        .single()
+        .single() as { data: { checked_in_at: string; status: string } | null }
 
       return err(
         E.ALREADY_CHECKED_IN,
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
     message:         "Absensi berhasil dicatat! ✅",
     distance_meter:  distanceRounded,
     max_radius:      session.radius_meter,
-    checked_in_at:   attendance.checked_in_at,
-    status:          attendance.status,
+    checked_in_at:   attendance?.checked_in_at ?? null,
+    status:          attendance?.status ?? "hadir",
   })
 }

@@ -74,7 +74,8 @@ export async function POST(request: Request) {
   }
   const { name, code, semester, lecturer, location, total_sessions_planned, min_attendance_pct, description } = parsed.data
 
-  const service = createSupabaseServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createSupabaseServiceClient() as any
 
   // Insert class
   const { data: kelas, error: insertErr } = await service
@@ -98,13 +99,11 @@ export async function POST(request: Request) {
   }
 
   // Auto-enroll creator as dosen
-  await service
-    .from("enrollments")
-    .insert({ class_id: kelas.id, user_id: user.id, peran: "dosen" })
-    .catch(() => {/* ignore duplicate */})
+  try {
+    await service
+      .from("enrollments")
+      .insert({ class_id: kelas.id, user_id: user.id, peran: "dosen" })
+  } catch {/* ignore duplicate */}
 
-  // Update profile dosen field if present
-  // (stored as dosen name in profile is separate from auth email — ignore for now)
-
-  return ok({ ...kelas, dosen: lecturer }, 201)
+  return ok({ ...(kelas as object), dosen: lecturer }, 201)
 }

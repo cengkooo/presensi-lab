@@ -3,7 +3,6 @@
 // Ambil sesi aktif yang belum expired
 // Auth: semua user yang login (mahasiswa juga bisa)
 // ======================================================
-import { NextResponse } from "next/server"
 import { ok, err, E, getAuthUser } from "@/lib/apiHelpers"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 

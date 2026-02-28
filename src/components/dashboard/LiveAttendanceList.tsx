@@ -1,21 +1,23 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
-import { CheckCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface AttendeeItem {
   id: string;
   name: string;
-  email: string;
+  nim: string;
   initial: string;
   time: string;
-  distance: number;
+  distance: number | null;
+  status: string;
 }
 
 // Color for distance badge
-function DistanceBadge({ distance }: { distance: number }) {
-  const label = `${distance}m`;
+function DistanceBadge({ distance }: { distance: number | null }) {
+  if (distance == null) return null;
   const style =
     distance < 30
       ? { bg: "rgba(16,185,129,0.15)", color: "#34D399", border: "rgba(16,185,129,0.25)" }
@@ -31,44 +33,93 @@ function DistanceBadge({ distance }: { distance: number }) {
         color: style.color,
         border: `1px solid ${style.border}`,
       }}
-    >
-      {label}
+    >    
+      {distance}m
     </span>
   );
 }
 
-// Mock seed data
-const SEED_DATA: AttendeeItem[] = [
-  { id: "1", name: "Jordan Dika", email: "jordan.d@presenslab.com", initial: "JD", time: "08:15 AM", distance: 18 },
-  { id: "2", name: "Amira Safira", email: "amira.s@presenslab.com", initial: "AS", time: "08:32 AM", distance: 45 },
-  { id: "3", name: "Budi Waluyo", email: "budi.w@presenslab.com", initial: "BW", time: "08:47 AM", distance: 92 },
-];
+interface Props {
+  isActive?: boolean;
+  sessionId?: string | null;
+}
 
-export function LiveAttendanceList({ isActive = false }: { isActive?: boolean }) {
-  const [items, setItems] = useState<AttendeeItem[]>([]);
+export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
+  const [items,        setItems]        = useState<AttendeeItem[]>([]);
   const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
+  const [loading,      setLoading]      = useState(false);
+  const channelRef = useRef<ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null>(null);
 
-  // Simulate incoming data when active
+  const addItem = (item: AttendeeItem) => {
+    setItems((prev) => {
+      if (prev.find((i) => i.id === item.id)) return prev;
+      return [item, ...prev];
+    });
+    setAnimatingIds((prev) => new Set(prev).add(item.id));
+    setTimeout(() => {
+      setAnimatingIds((prev) => { const n = new Set(prev); n.delete(item.id); return n; });
+    }, 600);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapItem = (row: any): AttendeeItem => ({
+    id:       row.id,
+    name:     row.profiles?.full_name ?? row.user_id?.slice(0, 8) ?? "—",
+    nim:      row.profiles?.nim ?? "",
+    initial:  (row.profiles?.full_name ?? "U").split(" ").map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase(),
+    time:     row.checked_in_at
+                ? new Date(row.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+                : "--:--",
+    distance: row.distance_meter ?? null,
+    status:   row.status ?? "hadir",
+  });
+
   useEffect(() => {
-    if (!isActive) {
+    if (!isActive || !sessionId) {
       setItems([]);
+      if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current = null; }
       return;
     }
-    // Add seed items with delay
-    SEED_DATA.forEach((item, i) => {
-      setTimeout(() => {
-        setItems((prev) => [item, ...prev]);
-        setAnimatingIds((prev) => new Set(prev).add(item.id));
-        setTimeout(() => {
-          setAnimatingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(item.id);
-            return next;
-          });
-        }, 600);
-      }, i * 1500);
-    });
-  }, [isActive]);
+
+    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    // Initial load
+    setLoading(true);
+    Promise.resolve(
+      sb.from("attendance")
+        .select("id, status, checked_in_at, distance_meter, profiles ( full_name, nim )")
+        .eq("session_id", sessionId)
+        .order("checked_in_at", { ascending: false })
+    ).then(({ data }: { data: unknown[] | null }) => {
+      if (data) setItems(data.map(mapItem));
+    }).catch(() => {}).finally(() => setLoading(false));
+
+    // Realtime subscription
+    if (channelRef.current) channelRef.current.unsubscribe();
+
+    const channel = supabase
+      .channel(`attendance:${sessionId}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "INSERT", schema: "public", table: "attendance",
+        filter: `session_id=eq.${sessionId}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, async (payload: any) => {
+        const newRow = payload.new;
+        if (!newRow) return;
+        const { data: profile } = await Promise.resolve(
+          sb.from("profiles").select("full_name, nim").eq("id", newRow.user_id).single()
+        ) as { data: { full_name: string; nim: string } | null };
+        addItem(mapItem({ ...newRow, profiles: profile }));
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+    return () => { channel.unsubscribe(); channelRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, sessionId]);
 
   return (
     <GlassCard className="p-5">
@@ -95,8 +146,14 @@ export function LiveAttendanceList({ isActive = false }: { isActive?: boolean })
         )}
       </div>
 
+      {loading && (
+        <div className="flex justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      )}
+
       {/* Empty state */}
-      {items.length === 0 && (
+      {!loading && items.length === 0 && (
         <div className="flex flex-col items-center justify-center py-10 gap-3">
           <div className="relative w-12 h-12 flex items-center justify-center">
             <span
@@ -156,7 +213,7 @@ export function LiveAttendanceList({ isActive = false }: { isActive?: boolean })
                   {item.name}
                 </p>
                 <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                  {item.email}
+                  {item.nim}
                 </p>
               </div>
               {/* Time + Distance */}

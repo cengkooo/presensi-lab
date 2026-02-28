@@ -57,6 +57,7 @@ function useDashStats() {
 
 export default function DashboardPage() {
   const [activateState, setActivateState] = useState<ActivateState>("idle");
+  const [activeSessId,  setActiveSessId]  = useState<string | null>(null);
   const { toasts, toast, dismissToast } = useToast();
   const { stats } = useDashStats();
 
@@ -145,13 +146,14 @@ export default function DashboardPage() {
         className="two-col-grid"
       >
         <ActivateAttendance
-          onStateChange={(s) => {
+          onStateChange={(s, sid) => {
             setActivateState(s);
+            setActiveSessId(sid ?? null);
             if (s === "active") toast.success("Sesi absensi berhasil diaktifkan!");
             if (s === "expired") toast.warning("Sesi absensi telah berakhir.");
           }}
         />
-        <LiveAttendanceList isActive={activateState === "active"} />
+        <LiveAttendanceList isActive={activateState === "active"} sessionId={activeSessId} />
       </div>
 
       {/* ── SESSION MANAGER ── */}

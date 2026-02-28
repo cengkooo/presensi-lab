@@ -49,7 +49,8 @@ export async function GET(request: NextRequest) {
 
   // ── Upsert profile ────────────────────────────────────
   // Gunakan service role agar bisa INSERT walau profil belum ada
-  const serviceClient = createSupabaseServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serviceClient = createSupabaseServiceClient() as any
   const { error: upsertErr } = await serviceClient
     .from("profiles")
     .upsert(

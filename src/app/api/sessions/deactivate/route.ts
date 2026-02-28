@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
   const { session_id } = parsed.data
 
   // 3. Ambil sesi
-  const serviceClient = createSupabaseServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serviceClient = createSupabaseServiceClient() as any
   const { data: session, error: sessionErr } = await serviceClient
     .from("sessions")
     .select("id, is_active, activated_by, class_id")
@@ -66,5 +67,5 @@ export async function POST(request: NextRequest) {
     return err(E.INTERNAL_ERROR, "Gagal menonaktifkan sesi.", 500)
   }
 
-  return ok(data)
+  return ok(data as object)
 }

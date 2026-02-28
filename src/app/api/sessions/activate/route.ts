@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
   const { session_id, lat, lng, radius_meter, duration_minutes } = parsed.data
 
   // 3. Ambil sesi — pastikan ada dan ambil class_id-nya
-  const serviceClient = createSupabaseServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serviceClient = createSupabaseServiceClient() as any
   const { data: session, error: sessionErr } = await serviceClient
     .from("sessions")
     .select("id, class_id, is_active")
@@ -82,5 +83,5 @@ export async function POST(request: NextRequest) {
     return err(E.INTERNAL_ERROR, "Gagal mengaktifkan sesi.", 500)
   }
 
-  return ok(data)
+  return ok(data as object)
 }

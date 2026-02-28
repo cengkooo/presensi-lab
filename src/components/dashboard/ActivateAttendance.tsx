@@ -26,7 +26,7 @@ interface AvailableSession {
 }
 
 interface ActivateAttendanceProps {
-  onStateChange?: (state: ActivateState) => void;
+  onStateChange?: (state: ActivateState, sessionId?: string | null) => void;
 }
 
 export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
@@ -146,7 +146,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
       setExpiresAt(new Date(json.data.expires_at));
       setAttendeeCount(0);
       setState("active");
-      onStateChange?.("active");
+      onStateChange?.("active", selectedSession);
     } catch {
       alert("Gagal terhubung ke server.");
     } finally {
@@ -186,13 +186,13 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
       setActionLoading(false);
       setActiveSessId(null);
       setState("expired");
-      onStateChange?.("expired");
+      onStateChange?.("expired", null);
     }
   }, [activeSessId, onStateChange]);
 
   const handleExpired = useCallback(() => {
     setState("expired");
-    onStateChange?.("expired");
+    onStateChange?.("expired", null);
   }, [onStateChange]);
 
   return (
@@ -475,7 +475,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
               setGpsCoords(null);
               setAttendeeCount(0);
               setActiveSessId(null);
-              onStateChange?.("idle");
+              onStateChange?.("idle", null);
             }}
             fullWidth
             className="py-3 rounded-xl"

@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
   const { session_id, extend_minutes } = parsed.data
 
   // 3. Ambil sesi
-  const serviceClient = createSupabaseServiceClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serviceClient = createSupabaseServiceClient() as any
   const { data: session, error: sessionErr } = await serviceClient
     .from("sessions")
     .select("id, is_active, expires_at, activated_by")
@@ -66,5 +67,5 @@ export async function POST(request: NextRequest) {
     return err(E.INTERNAL_ERROR, "Gagal memperpanjang sesi.", 500)
   }
 
-  return ok({ ...data, extended_by_minutes: extend_minutes })
+  return ok({ ...(data as object), extended_by_minutes: extend_minutes })
 }
