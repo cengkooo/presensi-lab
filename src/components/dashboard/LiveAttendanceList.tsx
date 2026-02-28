@@ -50,7 +50,11 @@ export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
   const [items,        setItems]        = useState<AttendeeItem[]>([]);
   const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
   const [loading,      setLoading]      = useState(false);
-  const channelRef = useRef<ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null>(null);
+  const [connStatus,   setConnStatus]   = useState<"connected" | "disconnected" | "reconnecting">("connected");
+  const [retryCount,   setRetryCount]   = useState(0);
+  const channelRef        = useRef<ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevStatusRef     = useRef<"connected" | "disconnected" | "reconnecting">("connected");
   const { toasts, toast, dismissToast } = useToast();
 
   const addItem = (item: AttendeeItem) => {
@@ -80,7 +84,10 @@ export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
   useEffect(() => {
     if (!isActive || !sessionId) {
       setItems([]);
+      setConnStatus("connected");
+      prevStatusRef.current = "connected";
       if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current = null; }
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
       return;
     }
 
@@ -118,23 +125,59 @@ export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
         addItem(mapItem({ ...newRow, profiles: profile }));
       })
       .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          toast.error("Koneksi Realtime terputus. Daftar kehadiran mungkin tidak diperbarui otomatis.");
+        if (status === "SUBSCRIBED") {
+          if (prevStatusRef.current !== "connected") {
+            toast.success("Koneksi realtime kembali normal.");
+          }
+          prevStatusRef.current = "connected";
+          setConnStatus("connected");
+          if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          if (prevStatusRef.current === "connected") {
+            toast.error("Koneksi Realtime terputus. Mencoba sambung ulang...");
+          }
+          prevStatusRef.current = "disconnected";
+          setConnStatus("disconnected");
+          if (!reconnectTimerRef.current) {
+            reconnectTimerRef.current = setTimeout(() => {
+              reconnectTimerRef.current = null;
+              setConnStatus("reconnecting");
+              setRetryCount((c) => c + 1);
+            }, 4000);
+          }
         }
       });
 
     channelRef.current = channel;
-    return () => { channel.unsubscribe(); channelRef.current = null; };
+    return () => {
+      channel.unsubscribe();
+      channelRef.current = null;
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, sessionId]);
+  }, [isActive, sessionId, retryCount]);
 
   return (
     <GlassCard className="p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-            Live Attendance Feed
-          </h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Live Attendance Feed
+            </h3>
+            {connStatus === "reconnecting" && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: "rgba(234,179,8,0.12)", color: "#facc15", border: "1px solid rgba(234,179,8,0.25)", display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#facc15", animation: "pulse-dot 1.5s ease-in-out infinite", display: "inline-block" }} />
+                Menyambung ulang...
+              </span>
+            )}
+            {connStatus === "disconnected" && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>
+                Terputus
+              </span>
+            )}
+          </div>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
             Update otomatis saat mahasiswa check-in
           </p>

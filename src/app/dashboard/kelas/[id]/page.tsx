@@ -7,7 +7,7 @@ import { Toast } from "@/components/ui/Toast";
 import {
   ChevronLeft, FlaskConical, Users, Plus, X,
   CheckCircle, Radio, Clock, CalendarDays, MapPin, RefreshCw,
-  Edit2, Trash2, ZapOff,
+  Edit2, Trash2, ZapOff, UserPlus, Search,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -306,6 +306,235 @@ function DeactivateConfirmModal({
   );
 }
 
+// ── ADD MEMBER MODAL ────────────────────────────────────────────────────────
+interface AdminUserRow {
+  id: string;
+  full_name: string | null;
+  nim: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  role: string;
+}
+
+function AddMemberModal({
+  classId,
+  enrolledUserIds,
+  onClose,
+  onSuccess,
+}: {
+  classId: string;
+  enrolledUserIds: Set<string>;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedPeran, setSelectedPeran] = useState<Record<string, string>>({});
+  const [adding, setAdding] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/users", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j) => { setUsers((j.data ?? []) as AdminUserRow[]); setLoadingUsers(false); })
+      .catch(() => setLoadingUsers(false));
+  }, []);
+
+  const available = users.filter((u) => !enrolledUserIds.has(u.id));
+  const filtered = available.filter(
+    (u) =>
+      !search ||
+      (u.full_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (u.nim ?? "").includes(search)
+  );
+
+  const getPeran = (uid: string) => selectedPeran[uid] ?? "mahasiswa";
+  const setPeran = (uid: string, p: string) =>
+    setSelectedPeran((prev) => ({ ...prev, [uid]: p }));
+
+  const handleAdd = async (user: AdminUserRow) => {
+    setAdding(user.id);
+    setAddError(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = createSupabaseBrowserClient() as any;
+    const { error: insertErr } = await sb
+      .from("enrollments")
+      .insert({ class_id: classId, user_id: user.id, peran: getPeran(user.id) });
+    if (insertErr) {
+      setAddError(insertErr.message ?? "Gagal menambahkan anggota.");
+      setAdding(null);
+      return;
+    }
+    setAdding(null);
+    onSuccess();
+    onClose();
+  };
+
+  const peranColors: Record<string, { color: string; bg: string }> = {
+    mahasiswa: { color: "#34D399", bg: "rgba(16,185,129,0.08)" },
+    asisten:   { color: "#60a5fa", bg: "rgba(59,130,246,0.1)" },
+    dosen:     { color: "#facc15", bg: "rgba(234,179,8,0.1)" },
+  };
+
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)", padding: "16px" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 520, borderRadius: "20px", background: "rgba(8,24,20,0.99)", border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 0 60px rgba(16,185,129,0.1)", display: "flex", flexDirection: "column", maxHeight: "80vh" }}
+      >
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid rgba(16,185,129,0.1)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ width: 38, height: 38, borderRadius: "10px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <UserPlus size={17} style={{ color: "#34D399" }} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#f0fdf4" }}>Tambah Anggota</h3>
+              <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)", marginTop: "1px" }}>Pilih pengguna dari database untuk ditambahkan ke kelas ini</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ width: 30, height: 30, borderRadius: "8px", background: "transparent", border: "none", color: "rgba(110,231,183,0.4)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "color 0.15s" }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "#f0fdf4")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "rgba(110,231,183,0.4)")}
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: "12px 24px", borderBottom: "1px solid rgba(16,185,129,0.08)", flexShrink: 0 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "rgba(110,231,183,0.4)", pointerEvents: "none" }} />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari nama atau NIM..."
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px 8px 30px", borderRadius: "10px", background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.12)", color: "#f0fdf4", fontSize: "13px", outline: "none" }}
+            />
+          </div>
+          {available.length > 0 && (
+            <p style={{ marginTop: "6px", fontSize: "11px", color: "rgba(110,231,183,0.3)" }}>
+              {filtered.length} dari {available.length} pengguna belum terdaftar
+            </p>
+          )}
+        </div>
+
+        {/* List */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {loadingUsers ? (
+            <div style={{ padding: "8px 0" }}>
+              {[1, 2, 3].map((r) => (
+                <div key={r} style={{ display: "flex", gap: "12px", alignItems: "center", padding: "12px 24px", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(16,185,129,0.08)", flexShrink: 0, animation: "shimmer 1.5s ease-in-out infinite" }} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div style={{ height: 12, borderRadius: 6, background: "rgba(16,185,129,0.08)", width: "60%", animation: "shimmer 1.5s ease-in-out infinite" }} />
+                    <div style={{ height: 10, borderRadius: 6, background: "rgba(16,185,129,0.06)", width: "35%", animation: "shimmer 1.5s ease-in-out infinite" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <p style={{ padding: "32px 24px", textAlign: "center", fontSize: "13px", color: "rgba(110,231,183,0.35)" }}>
+              {available.length === 0
+                ? "Semua pengguna sudah terdaftar di kelas ini."
+                : "Tidak ada pengguna yang cocok dengan pencarian."}
+            </p>
+          ) : (
+            filtered.map((user) => {
+              const initials = (user.full_name ?? "?")
+                .split(" ")
+                .map((w) => w[0] ?? "")
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
+              const isAdding = adding === user.id;
+              const peran = getPeran(user.id);
+              const pc = peranColors[peran] ?? peranColors.mahasiswa;
+              return (
+                <div
+                  key={user.id}
+                  style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 24px", borderBottom: "1px solid rgba(255,255,255,0.03)", transition: "background 0.12s" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(16,185,129,0.04)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                >
+                  {/* Avatar */}
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, color: "#34D399", flexShrink: 0 }}>
+                    {initials}
+                  </div>
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: "#f0fdf4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {user.full_name ?? "—"}
+                    </p>
+                    <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.45)" }}>{user.nim ?? "—"}</p>
+                  </div>
+                  {/* Peran selector */}
+                  <select
+                    value={peran}
+                    onChange={(e) => setPeran(user.id, e.target.value)}
+                    style={{
+                      appearance: "none" as React.CSSProperties["appearance"],
+                      WebkitAppearance: "none" as React.CSSProperties["WebkitAppearance"],
+                      background: pc.bg,
+                      border: `1px solid ${pc.color}40`,
+                      borderRadius: "8px",
+                      padding: "4px 26px 4px 10px",
+                      color: pc.color,
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      outline: "none",
+                      flexShrink: 0,
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='${encodeURIComponent(pc.color)}' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "right 7px center",
+                    }}
+                  >
+                    <option value="mahasiswa">mahasiswa</option>
+                    <option value="asisten">asisten</option>
+                    <option value="dosen">dosen</option>
+                  </select>
+                  {/* Add button */}
+                  <button
+                    onClick={() => handleAdd(user)}
+                    disabled={isAdding}
+                    className="btn-primary rounded-lg"
+                    style={{ gap: "5px", padding: "5px 11px", fontSize: "12px", flexShrink: 0, opacity: isAdding ? 0.6 : 1, minWidth: 72, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    {isAdding ? (
+                      <div style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.6s linear infinite" }} />
+                    ) : (
+                      <><Plus size={11} /> Tambah</>
+                    )}
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {addError && (
+          <div style={{ padding: "10px 24px", borderTop: "1px solid rgba(239,68,68,0.15)", flexShrink: 0 }}>
+            <p style={{ fontSize: "12px", color: "#f87171" }}>{addError}</p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ padding: "12px 24px", borderTop: "1px solid rgba(16,185,129,0.08)", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={onClose} className="btn-ghost rounded-xl" style={{ padding: "8px 20px", fontSize: "13px" }}>Tutup</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TableSkeleton({ cols }: { cols: number }) {
   return (
     <div style={{ padding: "8px 0" }}>
@@ -326,6 +555,7 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateSession, setShowCreateSession] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
 
   // Tab state
   type TabId = "sesi" | "mahasiswa" | "rekap";
@@ -674,6 +904,11 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
           {isDosen && activeTab === "sesi" && (
             <button onClick={() => setShowCreateSession(true)} className="btn-primary rounded-xl" style={{ gap: "8px", padding: "8px 14px", fontSize: "12px" }}>
               <Plus size={13} /> Tambah Sesi
+            </button>
+          )}
+          {isDosen && activeTab === "mahasiswa" && (
+            <button onClick={() => setShowAddMember(true)} className="btn-primary rounded-xl" style={{ gap: "8px", padding: "8px 14px", fontSize: "12px", display: "inline-flex", alignItems: "center" }}>
+              <UserPlus size={13} /> Tambah Anggota
             </button>
           )}
         </div>
@@ -1052,6 +1287,18 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
           classId={classId}
           onClose={() => setShowCreateSession(false)}
           onSuccess={handleSessionCreated}
+        />
+      )}
+      {showAddMember && kelas && (
+        <AddMemberModal
+          classId={classId}
+          enrolledUserIds={new Set(enrollments.map((e) => e.profiles?.id ?? "").filter(Boolean))}
+          onClose={() => setShowAddMember(false)}
+          onSuccess={() => {
+            fetchEnrollments(kelas);
+            setKelas((prev) => prev ? { ...prev, enrollment_count: prev.enrollment_count + 1 } : prev);
+            toast.success("Anggota berhasil ditambahkan ke kelas.");
+          }}
         />
       )}
       {editingSess && (

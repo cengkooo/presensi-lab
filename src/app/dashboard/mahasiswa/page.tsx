@@ -8,7 +8,10 @@ import {
   X, ExternalLink, RefreshCw, GraduationCap,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useClasses } from "@/context/ClassesContext";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/useToast";
+import { Toast } from "@/components/ui/Toast";
+import { EnrollPopover } from "@/components/dashboard/EnrollPopover";
 
 const PAGE_SIZE = 10;
 
@@ -16,6 +19,7 @@ interface Profile {
   id: string;
   full_name: string | null;
   nim: string | null;
+  email: string | null;
   avatar_url: string | null;
   role: "mahasiswa" | "dosen" | "admin";
 }
@@ -72,8 +76,17 @@ function QuickDrawer({
   onEnrollSuccess: () => void;
 }) {
   const router = useRouter();
-  const { classes: allClasses } = useClasses();
+  const [allClasses, setAllClasses] = useState<{ id: string; code: string; name: string }[]>([]);
   const [enrollments, setEnrollments] = useState<DrawerEnrollment[]>([]);
+
+  useEffect(() => {
+    fetch("/api/classes", { credentials: "same-origin" })
+      .then((r) => r.json())
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((j) => { if (j.success) setAllClasses((j.data ?? []).map((c: any) => ({ id: c.id, code: c.code, name: c.name }))); })
+      .catch(() => {});
+  }, []);
+
   const [loadingEnroll, setLoadingEnroll] = useState(true);
   const [showClassPicker, setShowClassPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
@@ -304,31 +317,58 @@ export default function MahasiswaPage() {
   const [classFilter, setClassFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [drawerUser, setDrawerUser] = useState<Profile | null>(null);
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<{ userId: string; rect: DOMRect } | null>(null);
 
-  const { classes: allClasses } = useClasses();
+  const [allClasses, setAllClasses] = useState<{ id: string; code: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/classes", { credentials: "same-origin" })
+      .then((r) => r.json())
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((j) => { if (j.success) setAllClasses((j.data ?? []).map((c: any) => ({ id: c.id, code: c.code, name: c.name }))); })
+      .catch(() => {});
+  }, []);
+
+  const { profile: authProfile } = useAuth();
+  const { toasts, toast, dismissToast } = useToast();
+  const isViewerDosen = authProfile?.role === "dosen";
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = createSupabaseBrowserClient() as any;
 
-    const [profRes, enrollRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, full_name, nim, avatar_url, role")
-        .in("role", ["mahasiswa", "dosen"])
-        .order("full_name", { ascending: true }),
+    const [usersRes, enrollRes] = await Promise.all([
+      fetch("/api/admin/users", { credentials: "same-origin" }),
       supabase
         .from("enrollments")
         .select("user_id, class_id, classes(id, code, name)"),
     ]);
 
-    setProfiles((profRes.data as Profile[]) ?? []);
+    if (usersRes.ok) {
+      const json = await usersRes.json();
+      setProfiles((json.data as Profile[]) ?? []);
+    }
     setEnrollments((enrollRes.data as unknown as EnrollmentItem[]) ?? []);
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleEnrollSuccess = useCallback((
+    enrolledUserId: string,
+    classId: string,
+    classCode: string,
+    className: string,
+  ) => {
+    setEnrollments((prev) => [
+      ...prev,
+      { user_id: enrolledUserId, class_id: classId, classes: { id: classId, code: classCode, name: className } },
+    ]);
+    setPopoverAnchor(null);
+    toast.success(`Mahasiswa berhasil didaftarkan ke ${className}`);
+  }, [toast]);
 
   // Build user_id -> class badge list
   const badgesByUser = useMemo(() => {
@@ -350,7 +390,8 @@ export default function MahasiswaPage() {
         const matchSearch =
           !search ||
           (u.full_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          (u.nim ?? "").includes(search);
+          (u.nim ?? "").includes(search) ||
+          (u.email ?? "").toLowerCase().includes(search.toLowerCase());
         const matchRole = roleFilter === "all" || u.role === roleFilter;
         const matchClass =
           classFilter === "all" ||
@@ -374,12 +415,13 @@ export default function MahasiswaPage() {
 
   const exportCSV = () => {
     const BOM = "\uFEFF";
-    const header = ["Nama", "NIM", "Role", "Kelas"];
+    const header = ["Nama", "NIM", "Gmail", "Role", "Kelas"];
     const rows = filtered.map((u) => {
       const badges = badgesByUser.get(u.id) ?? [];
       return [
         `"${u.full_name ?? ""}"`,
         `"${u.nim ?? ""}"`,
+        `"${u.email ?? ""}"`,
         `"${u.role}"`,
         `"${badges.map((b) => b.code).join(", ")}"`,
       ];
@@ -473,10 +515,10 @@ export default function MahasiswaPage() {
       {/* Table */}
       <div className="glass rounded-2xl" style={{ overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "720px" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(16,185,129,0.1)" }}>
-                {["PENGGUNA", "NIM / NIP", "KELAS AKTIF", "ROLE", ""].map((col) => (
+                {["PENGGUNA", "NIM / NIP", "GMAIL", "KELAS AKTIF", "ROLE", ""].map((col) => (
                   <th
                     key={col}
                     style={{ textAlign: "left", padding: "13px 16px", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", color: "#10B981" }}
@@ -489,14 +531,14 @@ export default function MahasiswaPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "rgba(110,231,183,0.4)", fontSize: "13px" }}>
+                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "rgba(110,231,183,0.4)", fontSize: "13px" }}>
                     Memuat data...
                   </td>
                 </tr>
               )}
               {!loading && paginated.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "rgba(110,231,183,0.4)", fontSize: "13px" }}>
+                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "rgba(110,231,183,0.4)", fontSize: "13px" }}>
                     Tidak ada pengguna ditemukan.
                   </td>
                 </tr>
@@ -508,10 +550,12 @@ export default function MahasiswaPage() {
                     key={u.id}
                     style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "all 0.15s" }}
                     onMouseEnter={(e) => {
+                      setHoveredRowId(u.id);
                       (e.currentTarget as HTMLElement).style.background = "rgba(16,185,129,0.04)";
                       (e.currentTarget as HTMLElement).style.boxShadow = "inset 3px 0 0 #10B981";
                     }}
                     onMouseLeave={(e) => {
+                      setHoveredRowId(null);
                       (e.currentTarget as HTMLElement).style.background = "transparent";
                       (e.currentTarget as HTMLElement).style.boxShadow = "none";
                     }}
@@ -529,6 +573,19 @@ export default function MahasiswaPage() {
                     <td style={{ padding: "13px 16px" }}>
                       <p style={{ fontSize: "12px", color: "#f0fdf4", fontVariantNumeric: "tabular-nums" }}>{u.nim ?? "—"}</p>
                     </td>
+                    <td style={{ padding: "13px 16px", maxWidth: 200 }}>
+                      {u.email ? (
+                        <a
+                          href={`mailto:${u.email}`}
+                          style={{ fontSize: "11px", color: "rgba(110,231,183,0.7)", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          title={u.email}
+                        >
+                          {u.email}
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "rgba(110,231,183,0.25)" }}>—</span>
+                      )}
+                    </td>
                     <td style={{ padding: "13px 16px" }}>
                       <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
                         {badges.map((b) => (
@@ -540,8 +597,53 @@ export default function MahasiswaPage() {
                             {b.code}
                           </Link>
                         ))}
+                        {badges.length > 0 && (
+                          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: "rgba(110,231,183,0.6)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                            {badges.length}
+                          </span>
+                        )}
                         {badges.length === 0 && (
                           <span style={{ fontSize: "11px", color: "rgba(110,231,183,0.25)" }}>—</span>
+                        )}
+                        {isViewerDosen && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                              setPopoverAnchor({ userId: u.id, rect });
+                            }}
+                            style={{
+                              width: 24, height: 24, borderRadius: "50%",
+                              background: "rgba(34,197,94,0.1)",
+                              border: "1px solid rgba(74,222,128,0.25)",
+                              color: "#22c55e",
+                              fontSize: "14px",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "opacity 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s",
+                              opacity: hoveredRowId === u.id ? 1 : 0,
+                              pointerEvents: hoveredRowId === u.id ? "auto" : "none",
+                              flexShrink: 0,
+                              lineHeight: 1,
+                              padding: 0,
+                            }}
+                            onMouseEnter={(e) => {
+                              const el = e.currentTarget as HTMLButtonElement;
+                              el.style.background = "rgba(34,197,94,0.2)";
+                              el.style.borderColor = "rgba(74,222,128,0.5)";
+                              el.style.boxShadow = "0 0 8px rgba(34,197,94,0.2)";
+                              el.style.transform = "scale(1.1)";
+                            }}
+                            onMouseLeave={(e) => {
+                              const el = e.currentTarget as HTMLButtonElement;
+                              el.style.background = "rgba(34,197,94,0.1)";
+                              el.style.borderColor = "rgba(74,222,128,0.25)";
+                              el.style.boxShadow = "none";
+                              el.style.transform = "scale(1)";
+                            }}
+                          >
+                            +
+                          </button>
                         )}
                       </div>
                     </td>
@@ -617,6 +719,28 @@ export default function MahasiswaPage() {
           onEnrollSuccess={fetchData}
         />
       )}
+
+      {/* Enroll Popover */}
+      {popoverAnchor && isViewerDosen && (
+        <EnrollPopover
+          targetUserId={popoverAnchor.userId}
+          targetUserName={profiles.find((p) => p.id === popoverAnchor.userId)?.full_name ?? null}
+          enrolledClassIds={new Set(badgesByUser.get(popoverAnchor.userId)?.map((b) => b.id) ?? [])}
+          allClasses={allClasses}
+          anchorRect={popoverAnchor.rect}
+          onSuccess={(classId, classCode, className) =>
+            handleEnrollSuccess(popoverAnchor.userId, classId, classCode, className)
+          }
+          onClose={() => setPopoverAnchor(null)}
+        />
+      )}
+
+      {/* Toasts */}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 10000, display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+        {toasts.map((t) => (
+          <Toast key={t.id} id={t.id} message={t.message} type={t.type} onDismiss={dismissToast} />
+        ))}
+      </div>
     </div>
   );
 }

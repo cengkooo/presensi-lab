@@ -6,7 +6,6 @@ import {
   FlaskConical, Users, ChevronRight,
   CheckCircle, Radio, Plus, X,
 } from "lucide-react";
-import { useClasses } from "@/context/ClassesContext";
 import type { PraktikumClass } from "@/types";
 
 // ── Form state shape ───────────────────────────────────────────────────────
@@ -67,12 +66,34 @@ function Field({
 
 // ── Main page ─────────────────────────────────────────────────────────────
 export default function KelasPage() {
-  const { classes: allClasses, addClass, refetch } = useClasses();
+  const [allClasses, setAllClasses] = useState<PraktikumClass[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<NewClassForm>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<NewClassForm>>({});
   const [submitting, setSubmitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // ── Fetch classes from API ────────────────────────────────────────────────
+  const fetchClasses = useCallback(async () => {
+    const res = await fetch("/api/classes", { credentials: "same-origin" });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setAllClasses(json.data.map((raw: any): PraktikumClass => ({
+        id:                     raw.id,
+        code:                   raw.code ?? "",
+        name:                   raw.name ?? "",
+        semester:               raw.semester ?? "",
+        lecturer:               raw.lecturer ?? raw.dosen ?? "",
+        location:               raw.location ?? "",
+        total_sessions_planned: raw.total_sessions_planned ?? 14,
+        min_attendance_pct:     raw.min_attendance_pct ?? 75,
+        created_at:             raw.created_at ?? "",
+      })));
+    }
+  }, []);
+
+  useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
   const setField = (key: keyof NewClassForm) => (val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -129,20 +150,7 @@ export default function KelasPage() {
       });
       const json = await res.json();
       if (json.success) {
-        // Optimistic: add to context so UI updates immediately
-        const newKelas: PraktikumClass = {
-          id:                    json.data.id,
-          name:                  json.data.name,
-          code:                  json.data.code,
-          semester:              json.data.semester,
-          lecturer:              json.data.dosen ?? form.lecturer.trim(),
-          location:              json.data.location,
-          total_sessions_planned: json.data.total_sessions_planned,
-          min_attendance_pct:    json.data.min_attendance_pct,
-          created_at:            json.data.created_at,
-        };
-        addClass(newKelas);
-        refetch();
+        fetchClasses();
       } else {
         alert(json.message ?? "Gagal membuat kelas.");
       }
