@@ -48,7 +48,7 @@ export interface Attendance {
   session_id: string;         // FK → Session.id
   user_id: string;            // FK → User (student)
   status: AttendanceStatus;
-  distance_meters: number | null;
+  distance_meter: number | null;
   checked_in_at: string | null;
   student_lat: number | null;
   student_lng: number | null;

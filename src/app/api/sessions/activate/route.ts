@@ -10,11 +10,12 @@ import { ok, err, E, getAuthUser, isDosenOfClass } from "@/lib/apiHelpers"
 import { createSupabaseServiceClient } from "@/lib/supabase/server"
 
 const schema = z.object({
-  session_id:       z.string().uuid("session_id harus berupa UUID"),
-  lat:              z.number({ error: "lat wajib diisi" }),
-  lng:              z.number({ error: "lng wajib diisi" }),
-  radius_meter:     z.number().min(10).max(1000).default(100),
-  duration_minutes: z.number().min(5).max(480).default(30),
+  session_id:         z.string().uuid("session_id harus berupa UUID"),
+  lat:                z.number({ error: "lat wajib diisi" }),
+  lng:                z.number({ error: "lng wajib diisi" }),
+  radius_meter:       z.number().min(10).max(1000).default(100),
+  duration_minutes:   z.number().min(5).max(480).default(30),
+  late_after_minutes: z.number().min(1).max(120).optional(), // menit setelah aktivasi → status "telat"
 })
 
 export async function POST(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     return err(E.VALIDATION_ERROR, parsed.error.issues[0]?.message ?? "Input tidak valid.", 400)
   }
 
-  const { session_id, lat, lng, radius_meter, duration_minutes } = parsed.data
+  const { session_id, lat, lng, radius_meter, duration_minutes, late_after_minutes } = parsed.data
 
   // 3. Ambil sesi — pastikan ada dan ambil class_id-nya
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,14 +66,15 @@ export async function POST(request: NextRequest) {
   const { data, error: updateErr } = await serviceClient
     .from("sessions")
     .update({
-      is_active:     true,
+      is_active:          true,
       lat,
       lng,
       radius_meter,
-      expires_at:    expiresAt,
-      activated_by:  user.id,
-      activated_at:  now.toISOString(),
-      deactivated_at: null,
+      expires_at:         expiresAt,
+      activated_by:       user.id,
+      activated_at:       now.toISOString(),
+      deactivated_at:     null,
+      late_after_minutes: late_after_minutes ?? null,
     })
     .eq("id", session_id)
     .select()

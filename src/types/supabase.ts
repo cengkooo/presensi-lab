@@ -22,7 +22,7 @@ export type Database = {
           full_name: string | null
           nim: string | null
           avatar_url: string | null
-          role: "mahasiswa" | "dosen" | "admin"
+          role: "mahasiswa" | "dosen" | "asisten" | "admin"
           updated_at: string | null
         }
         Insert: {
@@ -30,14 +30,14 @@ export type Database = {
           full_name?: string | null
           nim?: string | null
           avatar_url?: string | null
-          role?: "mahasiswa" | "dosen" | "admin"
+          role?: "mahasiswa" | "dosen" | "asisten" | "admin"
           updated_at?: string | null
         }
         Update: {
           full_name?: string | null
           nim?: string | null
           avatar_url?: string | null
-          role?: "mahasiswa" | "dosen" | "admin"
+          role?: "mahasiswa" | "dosen" | "asisten" | "admin"
           updated_at?: string | null
         }
       }
@@ -111,6 +111,7 @@ export type Database = {
           activated_by: string | null
           activated_at: string | null
           deactivated_at: string | null
+          late_after_minutes: number | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -130,6 +131,7 @@ export type Database = {
           activated_by?: string | null
           activated_at?: string | null
           deactivated_at?: string | null
+          late_after_minutes?: number | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -147,6 +149,7 @@ export type Database = {
           activated_by?: string | null
           activated_at?: string | null
           deactivated_at?: string | null
+          late_after_minutes?: number | null
           updated_at?: string
         }
       }

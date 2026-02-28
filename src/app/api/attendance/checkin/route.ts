@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: session, error: sessionErr } = await (supabase as any)
     .from("sessions")
-    .select("id, class_id, is_active, expires_at, lat, lng, radius_meter")
+    .select("id, class_id, is_active, expires_at, lat, lng, radius_meter, activated_at, late_after_minutes")
     .eq("id", session_id)
     .single() as { data: import("@/types/supabase").SessionRow | null; error: unknown }
 
@@ -86,6 +86,17 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // ── STEP 8b: Tentukan status hadir / telat ──────────────
+  let attendanceStatus: "hadir" | "telat" = "hadir"
+  if (session.late_after_minutes && session.activated_at) {
+    const lateThreshold = new Date(
+      new Date(session.activated_at).getTime() + session.late_after_minutes * 60 * 1000
+    )
+    if (new Date() > lateThreshold) {
+      attendanceStatus = "telat"
+    }
+  }
+
   // ── STEP 9: Insert attendance ─────────────────────────
   // Gunakan service role agar bisa insert tanpa terganjal RLS insert policy edge case
   const serviceClient = createSupabaseServiceClient()
@@ -94,11 +105,11 @@ export async function POST(request: NextRequest) {
     .from("attendance")
     .insert({
       session_id,
-      user_id:       user.id,
-      student_lat:   lat,
-      student_lng:   lng,
+      user_id:        user.id,
+      student_lat:    lat,
+      student_lng:    lng,
       distance_meter: distanceRounded,
-      status:        "hadir",
+      status:         attendanceStatus,
     })
     .select()
     .single() as { data: import("@/types/supabase").AttendanceRow | null; error: { code: string; message: string } | null }
@@ -129,10 +140,12 @@ export async function POST(request: NextRequest) {
 
   // ── STEP 10: Return success ───────────────────────────
   return ok({
-    message:         "Absensi berhasil dicatat! ✅",
+    message:         attendanceStatus === "telat"
+      ? "Absensi berhasil dicatat, namun kamu tercatat telat. ⏰"
+      : "Absensi berhasil dicatat! ✅",
     distance_meter:  distanceRounded,
     max_radius:      session.radius_meter,
     checked_in_at:   attendance?.checked_in_at ?? null,
-    status:          attendance?.status ?? "hadir",
+    status:          attendance?.status ?? attendanceStatus,
   })
 }

@@ -33,7 +33,7 @@ interface AttendanceRow {
   id: string;
   status: "hadir" | "telat" | "absen" | "ditolak";
   checked_in_at: string | null;
-  distance_meters: number | null;
+  distance_meter: number | null;
   session_title: string;
   session_date: string;
   class_code: string;
@@ -81,7 +81,7 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
         .eq("user_id", userId),
       supabase
         .from("attendance")
-        .select("id, status, checked_in_at, distance_meters, sessions!inner(id, title, session_date, class_id, classes!inner(id, code, name))")
+        .select("id, status, checked_in_at, distance_meter, sessions!inner(id, title, session_date, class_id, classes!inner(id, code, name))")
         .eq("user_id", userId)
         .order("sessions.session_date", { ascending: false })
         .limit(20),
@@ -132,7 +132,7 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
         id: a.id,
         status: a.status as AttendanceRow["status"],
         checked_in_at: a.checked_in_at,
-        distance_meters: a.distance_meters,
+        distance_meter: a.distance_meter,
         session_title: sess?.title ?? "—",
         session_date: sess?.session_date ?? "",
         class_code: sess?.classes?.code ?? "—",
@@ -315,9 +315,9 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
                           {new Date(a.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
                         </span>
                       )}
-                      {a.distance_meters !== null && (
+                      {a.distance_meter !== null && (
                         <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "rgba(110,231,183,0.4)" }}>
-                          <MapPin size={10} /> {a.distance_meters}m
+                          <MapPin size={10} /> {a.distance_meter}m
                         </span>
                       )}
                     </div>
