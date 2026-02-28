@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Clock,
   Users,
   Download,
   Settings,
@@ -20,7 +19,6 @@ import { cn } from "@/lib/utils";
 const navMain = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/kelas", label: "Kelas Praktikum", icon: BookOpen },
-  { href: "/dashboard/sesi", label: "Sesi Praktikum", icon: Clock },
   { href: "/dashboard/mahasiswa", label: "Mahasiswa", icon: Users },
   { href: "/dashboard/export", label: "Export Data", icon: Download },
 ];

@@ -234,3 +234,88 @@ export function computeStudentSummaries(classId: string): StudentAttendanceSumma
     return { user, enrollment, attendanceMap, total_hadir, total_telat, total_absen, total_ditolak, attendance_pct, is_eligible };
   }).sort((a, b) => b.attendance_pct - a.attendance_pct);
 }
+
+// -- NEW HELPERS for detail mahasiswa & enhanced list --
+
+export interface StudentClassSummary {
+  kelas: PraktikumClass;
+  enrollment: Enrollment;
+  total_sessions: number;
+  completed_sessions: number;
+  total_hadir: number;
+  total_telat: number;
+  attendance_pct: number;
+  is_eligible: boolean;
+}
+
+export interface AttendanceHistoryRow {
+  session: Session;
+  kelas: PraktikumClass;
+  attendance: Attendance | null;
+}
+
+export interface LowAttendanceAlert {
+  user: User;
+  kelas: PraktikumClass;
+  attendance_pct: number;
+  min_pct: number;
+}
+
+export function getStudentClassSummaries(userId: string): StudentClassSummary[] {
+  const enrollments = MOCK_ENROLLMENTS.filter((e) => e.user_id === userId);
+  return enrollments.map((enrollment) => {
+    const kelas = MOCK_CLASSES.find((c) => c.id === enrollment.class_id)!;
+    const sessions = MOCK_SESSIONS.filter((s) => s.class_id === kelas.id);
+    const completedSessions = sessions.filter((s) => !s.is_active);
+    const atts = MOCK_ATTENDANCES.filter(
+      (a) => a.user_id === userId && sessions.some((s) => s.id === a.session_id)
+    );
+    const total_hadir = atts.filter((a) => a.status === "hadir").length;
+    const total_telat = atts.filter((a) => a.status === "telat").length;
+    const pct = completedSessions.length > 0
+      ? Math.round(((total_hadir + total_telat) / completedSessions.length) * 100)
+      : 0;
+    return {
+      kelas, enrollment,
+      total_sessions: sessions.length,
+      completed_sessions: completedSessions.length,
+      total_hadir, total_telat,
+      attendance_pct: pct,
+      is_eligible: pct >= kelas.min_attendance_pct,
+    };
+  });
+}
+
+export function getStudentAttendanceHistory(userId: string): AttendanceHistoryRow[] {
+  const enrollments = MOCK_ENROLLMENTS.filter((e) => e.user_id === userId);
+  const rows: AttendanceHistoryRow[] = [];
+  enrollments.forEach((e) => {
+    const kelas = MOCK_CLASSES.find((c) => c.id === e.class_id)!;
+    const sessions = MOCK_SESSIONS.filter((s) => s.class_id === kelas.id);
+    sessions.forEach((session) => {
+      const attendance = MOCK_ATTENDANCES.find(
+        (a) => a.session_id === session.id && a.user_id === userId
+      ) ?? null;
+      rows.push({ session, kelas, attendance });
+    });
+  });
+  return rows.sort((a, b) => b.session.date.localeCompare(a.session.date));
+}
+
+export function getStudentClassBadges(userId: string): PraktikumClass[] {
+  const enrollments = MOCK_ENROLLMENTS.filter((e) => e.user_id === userId);
+  return enrollments.map((e) => MOCK_CLASSES.find((c) => c.id === e.class_id)!).filter(Boolean);
+}
+
+export function getLowAttendanceAlerts(): LowAttendanceAlert[] {
+  const alerts: LowAttendanceAlert[] = [];
+  MOCK_CLASSES.forEach((kelas) => {
+    const summaries = computeStudentSummaries(kelas.id);
+    summaries.forEach((s) => {
+      if (s.user.role === "mahasiswa" && !s.is_eligible) {
+        alerts.push({ user: s.user, kelas, attendance_pct: s.attendance_pct, min_pct: kelas.min_attendance_pct });
+      }
+    });
+  });
+  return alerts.sort((a, b) => a.attendance_pct - b.attendance_pct);
+}
