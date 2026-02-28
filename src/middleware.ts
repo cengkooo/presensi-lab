@@ -16,9 +16,7 @@ export async function middleware(request: NextRequest) {
   // ── Proteksi /dashboard/** ───────────────────────────
   if (pathname.startsWith("/dashboard")) {
     if (!user) {
-      const loginUrl = new URL("/", request.url)
-      loginUrl.searchParams.set("redirected", "1")
-      return NextResponse.redirect(loginUrl)
+      return NextResponse.redirect(new URL("/login", request.url))
     }
     return response
   }

@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Toast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/useToast";
 
 interface AttendeeItem {
   id: string;
@@ -49,6 +51,7 @@ export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
   const [animatingIds, setAnimatingIds] = useState<Set<string>>(new Set());
   const [loading,      setLoading]      = useState(false);
   const channelRef = useRef<ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null>(null);
+  const { toasts, toast, dismissToast } = useToast();
 
   const addItem = (item: AttendeeItem) => {
     setItems((prev) => {
@@ -114,7 +117,11 @@ export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
         ) as { data: { full_name: string; nim: string } | null };
         addItem(mapItem({ ...newRow, profiles: profile }));
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          toast.error("Koneksi Realtime terputus. Daftar kehadiran mungkin tidak diperbarui otomatis.");
+        }
+      });
 
     channelRef.current = channel;
     return () => { channel.unsubscribe(); channelRef.current = null; };
@@ -224,6 +231,20 @@ export function LiveAttendanceList({ isActive = false, sessionId }: Props) {
                 </span>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+      {/* Reconnect toasts (B6.6) */}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <Toast
+              key={t.id}
+              id={t.id}
+              message={t.message}
+              type={t.type}
+              onDismiss={dismissToast}
+            />
           ))}
         </div>
       )}

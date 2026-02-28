@@ -18,14 +18,14 @@ import { cn } from "@/lib/utils";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
 const navMain = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/kelas", label: "Kelas Praktikum", icon: BookOpen },
-  { href: "/dashboard/mahasiswa", label: "Mahasiswa", icon: Users },
-  { href: "/dashboard/export", label: "Export Data", icon: Download },
+  { href: "/dashboard",           label: "Dashboard",        icon: LayoutDashboard, staffOnly: false },
+  { href: "/dashboard/kelas",     label: "Kelas Praktikum",  icon: BookOpen,        staffOnly: false },
+  { href: "/dashboard/mahasiswa", label: "Mahasiswa",        icon: Users,           staffOnly: true  },
+  { href: "/dashboard/export",    label: "Export Data",      icon: Download,        staffOnly: true  },
 ];
 
 const navMgmt = [
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, staffOnly: true },
 ];
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
@@ -34,8 +34,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const { user, profile } = useSupabaseSession();
 
   const displayName    = profile?.full_name ?? user?.email?.split("@")[0] ?? "User";
-  const displayRole    = profile?.role === "dosen" ? "Dosen / Koordinator" : profile?.role === "mahasiswa" ? "Mahasiswa" : "Admin";
+  const role           = profile?.role ?? "mahasiswa";
+  const isStaff        = role === "dosen" || role === "asisten" || role === "admin";
+  const displayRole    = role === "dosen" ? "Dosen / Koordinator" : role === "asisten" ? "Asisten Dosen" : role === "admin" ? "Admin" : "Mahasiswa";
   const displayInitial = displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  const visibleMain = navMain.filter((item) => !item.staffOnly || isStaff);
+  const visibleMgmt = navMgmt.filter((item) => !item.staffOnly || isStaff);
 
   const handleSignOut = useCallback(async () => {
     await fetch("/api/auth/signout", { method: "POST" });
@@ -139,23 +144,25 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navMain.map((item) => (
+        {visibleMain.map((item) => (
           <NavItem key={item.href} href={item.href} label={item.label} Icon={item.icon} />
         ))}
-        <div
-          className="pt-5 mt-4"
-          style={{ borderTop: "1px solid rgba(16,185,129,0.08)" }}
-        >
-          <p
-            className="px-3 pb-2 text-xs font-bold tracking-widest uppercase"
-            style={{ color: "rgba(110,231,183,0.3)", fontSize: "9px" }}
+        {visibleMgmt.length > 0 && (
+          <div
+            className="pt-5 mt-4"
+            style={{ borderTop: "1px solid rgba(16,185,129,0.08)" }}
           >
-            Management
-          </p>
-          {navMgmt.map((item) => (
-            <NavItem key={item.href} href={item.href} label={item.label} Icon={item.icon} />
-          ))}
-        </div>
+            <p
+              className="px-3 pb-2 text-xs font-bold tracking-widest uppercase"
+              style={{ color: "rgba(110,231,183,0.3)", fontSize: "9px" }}
+            >
+              Management
+            </p>
+            {visibleMgmt.map((item) => (
+              <NavItem key={item.href} href={item.href} label={item.label} Icon={item.icon} />
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* User */}
@@ -200,6 +207,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { profile } = useSupabaseSession();
+
+  const role    = profile?.role ?? "mahasiswa";
+  const isStaff = role === "dosen" || role === "asisten" || role === "admin";
+  const visibleMain = navMain.filter((item) => !item.staffOnly || isStaff);
 
   return (
     <>
@@ -264,7 +276,7 @@ export function Sidebar() {
         }}
       >
         <div className="flex justify-around py-2">
-          {navMain.map((item) => {
+          {visibleMain.map((item) => {
             const Icon = item.icon;
             const active =
               pathname === item.href ||

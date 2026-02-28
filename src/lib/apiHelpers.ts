@@ -70,6 +70,11 @@ export async function getUserRole(userId: string): Promise<"mahasiswa" | "dosen"
   return (data?.role as "mahasiswa" | "dosen" | "admin") ?? null
 }
 
+// ── Check if role is staff (dosen / asisten / admin) ─
+export function isStaffRole(role: string | null): boolean {
+  return role === "dosen" || role === "asisten" || role === "admin"
+}
+
 // ── Is user dosen/admin of a class? ──────────────────
 export async function isDosenOfClass(userId: string, classId: string): Promise<boolean> {
   const supabase = await createSupabaseServerClient()

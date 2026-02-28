@@ -4,7 +4,7 @@
 // POST /api/classes
 // Buat kelas baru (dosen only)
 // ======================================================
-import { ok, err, E, getAuthUser, getUserRole } from "@/lib/apiHelpers"
+import { ok, err, E, getAuthUser, getUserRole, isStaffRole } from "@/lib/apiHelpers"
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
   if (!user) return err(E.UNAUTHORIZED, "Kamu harus login.", 401)
 
   const role = await getUserRole(user.id)
-  if (role !== "dosen" && role !== "admin") {
-    return err(E.FORBIDDEN, "Hanya dosen yang dapat membuat kelas.", 403)
+  if (!isStaffRole(role)) {
+    return err(E.FORBIDDEN, "Hanya dosen atau asisten yang dapat membuat kelas.", 403)
   }
 
   let body: unknown

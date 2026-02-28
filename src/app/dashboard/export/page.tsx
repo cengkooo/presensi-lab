@@ -1,12 +1,14 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Download, FileText, FileSpreadsheet, Printer,
   Calendar, ChevronDown, CheckCircle,
   Archive, Clock, ArrowRight, ClipboardList, SlidersHorizontal, History,
 } from "lucide-react";
-import { MOCK_ATTENDANCES, MOCK_SESSIONS, MOCK_CLASSES, MOCK_USERS } from "@/lib/mockData";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 /* ── EXPORT OPTIONS ── */
 const REPORT_TYPES = [
@@ -14,18 +16,6 @@ const REPORT_TYPES = [
   { id: "session", label: "Per Sesi Praktikum", desc: "Rekap kehadiran berdasarkan sesi tertentu" },
   { id: "student", label: "Per Mahasiswa", desc: "Rekap kehadiran per individu mahasiswa" },
   { id: "summary", label: "Rekap Bulanan", desc: "Ringkasan statistik kehadiran per bulan" },
-];
-
-const SESSIONS_CHOICE = [
-  "Semua Kelas",
-  ...MOCK_CLASSES.map((c) => `${c.code} — ${c.name}`),
-];
-
-/* ── RECENT EXPORTS ── */
-const RECENT = [
-  { filename: "absensi_jaringan_a1_2026-02-28.csv", type: "CSV", size: "12 KB", date: "28 Feb 2026, 09:15", status: "done" },
-  { filename: "rekap_bulanan_feb2026.csv", type: "CSV", size: "8.4 KB", date: "27 Feb 2026, 14:32", status: "done" },
-  { filename: "mahasiswa_all_2026-02-20.csv", type: "CSV", size: "24 KB", date: "20 Feb 2026, 10:00", status: "done" },
 ];
 
 /* ── STAT MINI ── */
@@ -41,62 +31,140 @@ function MiniStat({ label, value, icon }: { label: string; value: string; icon: 
   );
 }
 
+interface ClassOption { id: string; code: string; name: string; }
+
 export default function ExportPage() {
+  const { profile, loading: authLoading } = useSupabaseSession();
+  const role    = profile?.role ?? "mahasiswa";
+  const isStaff = role === "dosen" || role === "asisten" || role === "admin";
+
   const [reportType, setReportType] = useState("all");
-  const [selectedSession, setSelectedSession] = useState("Semua Kelas");
-  const [dateFrom, setDateFrom] = useState("2026-02-01");
-  const [dateTo, setDateTo] = useState("2026-02-28");
+  const [selectedClassId, setSelectedClassId] = useState("all");
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [dateFrom, setDateFrom] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0]
+  );
+  const [dateTo, setDateTo] = useState(new Date().toISOString().split("T")[0]);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [sessionCount, setSessionCount] = useState(0);
 
-  // Count records matching current filters
-  const filteredCount = useMemo(() => {
-    return MOCK_ATTENDANCES.filter((att) => {
-      const sess = MOCK_SESSIONS.find((s) => s.id === att.session_id);
-      const kelas = sess ? MOCK_CLASSES.find((c) => c.id === sess.class_id) : null;
-      if (!sess || !kelas) return false;
-      const matchClass = selectedSession === "Semua Kelas" || `${kelas.code} — ${kelas.name}` === selectedSession;
-      const matchDate = sess.date >= dateFrom && sess.date <= dateTo;
-      return matchClass && matchDate;
-    }).length;
-  }, [selectedSession, dateFrom, dateTo]);
+  // Fetch classes for dropdown
+  useEffect(() => {
+    fetch("/api/classes", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setClasses(json.data.map((c: any) => ({ id: c.id, code: c.code, name: c.name })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch counts when filters change
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase = createSupabaseBrowserClient() as any;
+    let attQuery = supabase
+      .from("attendance")
+      .select("id, sessions!inner( session_date, class_id )", { count: "exact", head: true })
+      .gte("sessions.session_date", dateFrom)
+      .lte("sessions.session_date", dateTo);
+    let sessQuery = supabase
+      .from("sessions")
+      .select("id", { count: "exact", head: true })
+      .gte("session_date", dateFrom)
+      .lte("session_date", dateTo);
+    if (selectedClassId !== "all") {
+      attQuery  = attQuery.eq("sessions.class_id", selectedClassId);
+      sessQuery = sessQuery.eq("class_id", selectedClassId);
+    }
+    Promise.all([attQuery, sessQuery]).then(
+      ([{ count: attCount }, { count: sCount }]: [{ count: number | null }, { count: number | null }]) => {
+        setTotalCount(attCount ?? 0);
+        setSessionCount(sCount ?? 0);
+      }
+    ).catch(() => {});
+  }, [selectedClassId, dateFrom, dateTo]);
 
   const handleExportCSV = async () => {
     setExporting(true);
-    await new Promise((r) => setTimeout(r, 900));
-    // Build real rows from mockData filtered by class + date range
-    const joined = MOCK_ATTENDANCES.map((att) => {
-      const user = MOCK_USERS.find((u) => u.id === att.user_id);
-      const sess = MOCK_SESSIONS.find((s) => s.id === att.session_id);
-      const kelas = sess ? MOCK_CLASSES.find((c) => c.id === sess.class_id) : null;
-      if (!user || !sess || !kelas) return null;
-      return { user, sess, kelas, att };
-    }).filter(Boolean) as { user: typeof MOCK_USERS[0]; sess: typeof MOCK_SESSIONS[0]; kelas: typeof MOCK_CLASSES[0]; att: typeof MOCK_ATTENDANCES[0] }[];
-    const rows = joined.filter((r) => {
-      const matchClass = selectedSession === "Semua Kelas" || `${r.kelas.code} — ${r.kelas.name}` === selectedSession;
-      const matchDate = r.sess.date >= dateFrom && r.sess.date <= dateTo;
-      return matchClass && matchDate;
-    });
-    const BOM = "\uFEFF";
-    const header = ["No", "Nama", "NIM", "Sesi", "Kelas", "Tanggal", "Jam Check-in", "Status", "Jarak (meter)"];
-    const csvRows = rows.map((r, i) => [
-      `"${i + 1}"`, `"${r.user.name}"`, `"${r.user.nim}"`,
-      `"${r.sess.title}"`, `"${r.kelas.code} — ${r.kelas.name}"`,
-      `"${r.sess.date}"`,
-      `"${r.att.checked_in_at ? new Date(r.att.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "--:--"}"`,
-      `"${r.att.status}"`, `"${r.att.distance_meters ?? "-"}"`,
-    ]);
-    const csv = BOM + [header.join(","), ...csvRows.map((r) => r.join(","))].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    Object.assign(document.createElement("a"), {
-      href: url,
-      download: `absensi_export_${dateTo}.csv`,
-    }).click();
-    URL.revokeObjectURL(url);
-    setExporting(false);
-    setExported(true);
-    setTimeout(() => setExported(false), 3000);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const supabase = createSupabaseBrowserClient() as any;
+      let query = supabase
+        .from("attendance")
+        .select(`
+          id, status, checked_in_at, distance_meter,
+          profiles ( full_name, nim ),
+          sessions!inner ( id, title, location, session_date, class_id,
+            classes ( code, name ) )
+        `)
+        .gte("sessions.session_date", dateFrom)
+        .lte("sessions.session_date", dateTo)
+        .order("checked_in_at", { ascending: true })
+        .limit(5000);
+      if (selectedClassId !== "all") {
+        query = query.eq("sessions.class_id", selectedClassId);
+      }
+      const { data } = await query;
+      if (!data || data.length === 0) {
+        alert("Tidak ada data untuk ekspor dengan filter yang dipilih.");
+        setExporting(false);
+        return;
+      }
+      const BOM = "\uFEFF";
+      const header = ["No", "Nama", "NIM", "Sesi", "Kelas", "Tanggal", "Jam Check-in", "Status", "Jarak (meter)"];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const csvRows = data.map((r: any, i: number) => [
+        `"${i + 1}"`,
+        `"${r.profiles?.full_name ?? "-"}"`,
+        `"${r.profiles?.nim ?? "-"}"`,
+        `"${r.sessions?.title ?? "-"}"`,
+        `"${r.sessions?.classes?.code ?? ""} — ${r.sessions?.classes?.name ?? ""}"`,
+        `"${r.sessions?.session_date ?? "-"}"`,
+        `"${r.checked_in_at ? new Date(r.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "--:--"}"`,
+        `"${r.status}"`,
+        `"${r.distance_meter ?? "-"}"`,
+      ]);
+      const csv = BOM + [header.join(","), ...csvRows.map((r: string[]) => r.join(","))].join("\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+      Object.assign(document.createElement("a"), {
+        href: url,
+        download: `absensi_export_${dateTo}.csv`,
+      }).click();
+      URL.revokeObjectURL(url);
+      setExported(true);
+      setTimeout(() => setExported(false), 3000);
+    } catch {
+      alert("Gagal mengambil data untuk ekspor.");
+    } finally {
+      setExporting(false);
+    }
   };
+
+  // ── Loading / Access Guard ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!isStaff) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "32px" }}>
+        <div style={{ fontSize: "40px" }}>🔒</div>
+        <h2 style={{ color: "#f0fdf4", fontSize: "18px", fontWeight: 700 }}>Akses Dibatasi</h2>
+        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", textAlign: "center" }}>
+          Halaman ini hanya dapat diakses oleh dosen dan asisten.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", padding: "28px 32px 48px", boxSizing: "border-box" }}>
@@ -110,8 +178,8 @@ export default function ExportPage() {
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px" }}>
-        <MiniStat label="Total Record" value={filteredCount.toLocaleString("id-ID")} icon={<Archive size={15} style={{ color: "#34D399" }} />} />
-        <MiniStat label="Sesi Tersedia" value={String(MOCK_SESSIONS.length)} icon={<Calendar size={15} style={{ color: "#34D399" }} />} />
+        <MiniStat label="Total Record" value={totalCount.toLocaleString("id-ID")} icon={<Archive size={15} style={{ color: "#34D399" }} />} />
+        <MiniStat label="Sesi Tersedia" value={sessionCount.toLocaleString("id-ID")} icon={<Calendar size={15} style={{ color: "#34D399" }} />} />
         <MiniStat label="Export Terakhir" value="Hari Ini" icon={<Clock size={15} style={{ color: "#34D399" }} />} />
       </div>
 
@@ -149,10 +217,13 @@ export default function ExportPage() {
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Sesi Praktikum</label>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Kelas Praktikum</label>
                 <div style={{ position: "relative" }}>
-                  <select className="select-glass" value={selectedSession} onChange={(e) => setSelectedSession(e.target.value)}>
-                    {SESSIONS_CHOICE.map((s) => <option key={s} value={s}>{s}</option>)}
+                  <select className="select-glass" value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
+                    <option value="all">Semua Kelas</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                    ))}
                   </select>
                   <ChevronDown size={14} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(110,231,183,0.3)", pointerEvents: "none" }} />
                 </div>
@@ -233,23 +304,24 @@ export default function ExportPage() {
             </div>
           </div>
 
-          {/* Recent Exports */}
+          {/* Info card */}
           <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "14px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <History size={15} style={{ color: "#34D399" }} /> Riwayat Export
+            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "14px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <History size={15} style={{ color: "#34D399" }} /> Panduan Export
             </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {RECENT.map((r) => (
-                <div key={r.filename} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                  <FileSpreadsheet size={14} style={{ color: "#34D399", flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: "12px", fontWeight: 600, color: "#f0fdf4", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.filename}</p>
-                    <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.35)" }}>{r.date} · {r.size}</p>
-                  </div>
-                  <CheckCircle size={13} style={{ color: "#34D399", flexShrink: 0 }} />
-                </div>
+            <ul style={{ display: "flex", flexDirection: "column", gap: "8px", paddingLeft: 0, listStyle: "none" }}>
+              {[
+                "Filter kelas + tanggal sebelum ekspor",
+                "Hasil CSV UTF-8 BOM — aman untuk Excel",
+                "Maksimal 5.000 baris per ekspor",
+                "Klik Export CSV lalu pilih folder simpan",
+              ].map((tip) => (
+                <li key={tip} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "rgba(110,231,183,0.5)" }}>
+                  <CheckCircle size={12} style={{ color: "#34D399", flexShrink: 0 }} />
+                  {tip}
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </div>
       </div>

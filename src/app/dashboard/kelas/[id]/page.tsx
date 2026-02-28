@@ -1,261 +1,344 @@
-﻿"use client";
+"use client";
 
-import { useState, useMemo } from "react";
+import { use, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
-  Download, FileText, FileSpreadsheet, Printer,
-  Calendar, ChevronDown, CheckCircle,
-  Archive, Clock, ArrowRight, ClipboardList, SlidersHorizontal, History,
+  ChevronLeft, FlaskConical, Users, Plus, X,
+  CheckCircle, Radio, Clock, CalendarDays, MapPin, RefreshCw,
 } from "lucide-react";
-import { MOCK_ATTENDANCES, MOCK_SESSIONS, MOCK_CLASSES, MOCK_USERS } from "@/lib/mockData";
 
-/* ── EXPORT OPTIONS ── */
-const REPORT_TYPES = [
-  { id: "all", label: "Semua Data Absensi", desc: "Seluruh riwayat kehadiran semua sesi" },
-  { id: "session", label: "Per Sesi Praktikum", desc: "Rekap kehadiran berdasarkan sesi tertentu" },
-  { id: "student", label: "Per Mahasiswa", desc: "Rekap kehadiran per individu mahasiswa" },
-  { id: "summary", label: "Rekap Bulanan", desc: "Ringkasan statistik kehadiran per bulan" },
-];
+const PAGE = "kelas-detail";
 
-const SESSIONS_CHOICE = [
-  "Semua Kelas",
-  ...MOCK_CLASSES.map((c) => `${c.code} — ${c.name}`),
-];
+interface SessionItem {
+  id: string;
+  title: string;
+  description: string | null;
+  session_date: string;
+  location: string | null;
+  is_active: boolean;
+  expires_at: string | null;
+  radius_meter: number;
+  created_at: string;
+}
 
-/* ── RECENT EXPORTS ── */
-const RECENT = [
-  { filename: "absensi_jaringan_a1_2026-02-28.csv", type: "CSV", size: "12 KB", date: "28 Feb 2026, 09:15", status: "done" },
-  { filename: "rekap_bulanan_feb2026.csv", type: "CSV", size: "8.4 KB", date: "27 Feb 2026, 14:32", status: "done" },
-  { filename: "mahasiswa_all_2026-02-20.csv", type: "CSV", size: "24 KB", date: "20 Feb 2026, 10:00", status: "done" },
-];
+interface ClassDetail {
+  id: string;
+  code: string;
+  name: string;
+  semester: string | null;
+  description: string | null;
+  location: string | null;
+  min_attendance_pct: number;
+  total_sessions_planned: number;
+  created_at: string;
+  sessions: SessionItem[];
+  enrollment_count: number;
+  my_peran: string | null;
+}
 
-/* ── STAT MINI ── */
-function MiniStat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+type SessionStatusType = "active" | "done" | "upcoming";
+
+function getSessionStatus(sess: SessionItem): SessionStatusType {
+  if (sess.is_active) return "active";
+  // If session_date is in the future (compared to today), it's upcoming
+  if (new Date(sess.session_date + "T23:59:59") > new Date()) return "upcoming";
+  return "done";
+}
+
+function SessionStatusBadge({ sess }: { sess: SessionItem }) {
+  const status = getSessionStatus(sess);
+  const map: Record<SessionStatusType, { label: string; color: string; bg: string; border: string }> = {
+    active: { label: "LIVE", color: "#f87171", bg: "rgba(239,68,68,0.12)", border: "rgba(239,68,68,0.3)" },
+    done: { label: "Selesai", color: "#34D399", bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.25)" },
+    upcoming: { label: "Mendatang", color: "#facc15", bg: "rgba(234,179,8,0.1)", border: "rgba(234,179,8,0.25)" },
+  };
+  const s = map[status];
   return (
-    <div className="glass rounded-2xl" style={{ padding: "18px 20px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
-        <span style={{ fontSize: "12px", color: "rgba(110,231,183,0.5)" }}>{label}</span>
+    <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "20px", background: s.bg, color: s.color, border: `1px solid ${s.border}`, letterSpacing: "0.05em", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+      {status === "active" && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f87171", display: "inline-block", animation: "pulse-dot 1.5s ease-in-out infinite" }} />}
+      {s.label}
+    </span>
+  );
+}
+
+function CreateSessionModal({
+  classId,
+  onClose,
+  onSuccess,
+}: {
+  classId: string;
+  onClose: () => void;
+  onSuccess: (sess: SessionItem) => void;
+}) {
+  const [form, setForm] = useState({ title: "", description: "", session_date: "", location: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    if (!form.title.trim() || !form.session_date) {
+      setError("Judul dan tanggal sesi wajib diisi.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    const res = await fetch("/api/sessions/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId, ...form, title: form.title.trim(), location: form.location.trim() || undefined, description: form.description.trim() || undefined }),
+    });
+    const json = await res.json();
+    if (!res.ok) { setError(json.message ?? "Gagal membuat sesi."); setSubmitting(false); return; }
+    onSuccess(json.data as SessionItem);
+    onClose();
+  };
+
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)", padding: "16px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, borderRadius: "20px", padding: "24px", background: "rgba(8,24,20,0.99)", border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 0 60px rgba(16,185,129,0.12)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#f0fdf4" }}>Tambah Sesi Baru</h3>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(110,231,183,0.4)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={13} />
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Judul Sesi *</label>
+            <input className="input-glass" placeholder="cth: Sesi 1 — Pengantar Jaringan" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Tanggal Sesi *</label>
+            <input className="input-glass" type="date" value={form.session_date} onChange={(e) => setForm((f) => ({ ...f, session_date: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Lokasi</label>
+            <input className="input-glass" placeholder="cth: Lab Komputer A" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(110,231,183,0.5)", marginBottom: "5px" }}>Deskripsi</label>
+            <input className="input-glass" placeholder="Opsional" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          </div>
+          {error && <p style={{ fontSize: "12px", color: "#f87171", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", padding: "8px 12px" }}>{error}</p>}
+        </div>
+        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+          <button onClick={onClose} className="btn-ghost flex-1 rounded-xl" style={{ padding: "10px" }}>Batal</button>
+          <button onClick={handleSubmit} disabled={submitting} className="btn-primary flex-1 rounded-xl" style={{ gap: "8px", padding: "10px", opacity: submitting ? 0.6 : 1 }}>
+            <Plus size={13} /> {submitting ? "Menyimpan..." : "Buat Sesi"}
+          </button>
+        </div>
       </div>
-      <p style={{ fontSize: "26px", fontWeight: 700, color: "#f0fdf4", fontVariantNumeric: "tabular-nums" }}>{value}</p>
     </div>
   );
 }
 
-export default function ExportPage() {
-  const [reportType, setReportType] = useState("all");
-  const [selectedSession, setSelectedSession] = useState("Semua Kelas");
-  const [dateFrom, setDateFrom] = useState("2026-02-01");
-  const [dateTo, setDateTo] = useState("2026-02-28");
-  const [exporting, setExporting] = useState(false);
-  const [exported, setExported] = useState(false);
+export default function KelasDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: classId } = use(params);
+  const [kelas, setKelas] = useState<ClassDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateSession, setShowCreateSession] = useState(false);
 
-  // Count records matching current filters
-  const filteredCount = useMemo(() => {
-    return MOCK_ATTENDANCES.filter((att) => {
-      const sess = MOCK_SESSIONS.find((s) => s.id === att.session_id);
-      const kelas = sess ? MOCK_CLASSES.find((c) => c.id === sess.class_id) : null;
-      if (!sess || !kelas) return false;
-      const matchClass = selectedSession === "Semua Kelas" || `${kelas.code} — ${kelas.name}` === selectedSession;
-      const matchDate = sess.date >= dateFrom && sess.date <= dateTo;
-      return matchClass && matchDate;
-    }).length;
-  }, [selectedSession, dateFrom, dateTo]);
+  const fetchKelas = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const res = await fetch(`/api/classes/${classId}`);
+    const json = await res.json();
+    if (!res.ok) { setError(json.message ?? "Gagal memuat kelas."); setLoading(false); return; }
+    setKelas(json.data as ClassDetail);
+    setLoading(false);
+  }, [classId]);
 
-  const handleExportCSV = async () => {
-    setExporting(true);
-    await new Promise((r) => setTimeout(r, 900));
-    // Build real rows from mockData filtered by class + date range
-    const joined = MOCK_ATTENDANCES.map((att) => {
-      const user = MOCK_USERS.find((u) => u.id === att.user_id);
-      const sess = MOCK_SESSIONS.find((s) => s.id === att.session_id);
-      const kelas = sess ? MOCK_CLASSES.find((c) => c.id === sess.class_id) : null;
-      if (!user || !sess || !kelas) return null;
-      return { user, sess, kelas, att };
-    }).filter(Boolean) as { user: typeof MOCK_USERS[0]; sess: typeof MOCK_SESSIONS[0]; kelas: typeof MOCK_CLASSES[0]; att: typeof MOCK_ATTENDANCES[0] }[];
-    const rows = joined.filter((r) => {
-      const matchClass = selectedSession === "Semua Kelas" || `${r.kelas.code} — ${r.kelas.name}` === selectedSession;
-      const matchDate = r.sess.date >= dateFrom && r.sess.date <= dateTo;
-      return matchClass && matchDate;
-    });
-    const BOM = "\uFEFF";
-    const header = ["No", "Nama", "NIM", "Sesi", "Kelas", "Tanggal", "Jam Check-in", "Status", "Jarak (meter)"];
-    const csvRows = rows.map((r, i) => [
-      `"${i + 1}"`, `"${r.user.name}"`, `"${r.user.nim}"`,
-      `"${r.sess.title}"`, `"${r.kelas.code} — ${r.kelas.name}"`,
-      `"${r.sess.date}"`,
-      `"${r.att.checked_in_at ? new Date(r.att.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "--:--"}"`,
-      `"${r.att.status}"`, `"${r.att.distance_meters ?? "-"}"`,
-    ]);
-    const csv = BOM + [header.join(","), ...csvRows.map((r) => r.join(","))].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    Object.assign(document.createElement("a"), {
-      href: url,
-      download: `absensi_export_${dateTo}.csv`,
-    }).click();
-    URL.revokeObjectURL(url);
-    setExporting(false);
-    setExported(true);
-    setTimeout(() => setExported(false), 3000);
+  useEffect(() => { fetchKelas(); }, [fetchKelas]);
+
+  const handleSessionCreated = (sess: SessionItem) => {
+    if (!kelas) return;
+    setKelas({ ...kelas, sessions: [sess, ...kelas.sessions] });
   };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", padding: "28px 32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px" }}>Memuat kelas...</p>
+      </div>
+    );
+  }
+
+  if (error || !kelas) {
+    return (
+      <div style={{ minHeight: "100vh", padding: "28px 32px" }}>
+        <Link href="/dashboard/kelas" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "rgba(110,231,183,0.5)", textDecoration: "none", marginBottom: "24px" }}>
+          <ChevronLeft size={14} /> Kembali ke Kelas
+        </Link>
+        <p style={{ color: "#f87171" }}>{error ?? "Kelas tidak ditemukan."}</p>
+      </div>
+    );
+  }
+
+  const isDosen = kelas.my_peran === "dosen" || kelas.my_peran === "asisten";
+  const completedSessions = kelas.sessions.filter((s) => !s.is_active && new Date(s.session_date + "T23:59:59") <= new Date());
+  const activeSessions = kelas.sessions.filter((s) => s.is_active);
+  const minPct = kelas.min_attendance_pct;
 
   return (
     <div style={{ minHeight: "100vh", padding: "28px 32px 48px", boxSizing: "border-box" }}>
-      {/* Header */}
-      <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ color: "#f0fdf4", fontSize: "28px", fontWeight: 700, lineHeight: 1.2 }}>Export Data</h1>
-        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", marginTop: "6px" }}>
-          Unduh data absensi dalam format CSV atau cetak laporan
-        </p>
+      {/* Breadcrumb */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "24px" }}>
+        <Link href="/dashboard/kelas" style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", color: "rgba(110,231,183,0.5)", textDecoration: "none", transition: "color 0.2s" }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "#34D399")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "rgba(110,231,183,0.5)")}>
+          <ChevronLeft size={14} /> Kelas Praktikum
+        </Link>
+        <span style={{ color: "rgba(110,231,183,0.2)" }}>/</span>
+        <span style={{ fontSize: "13px", color: "#f0fdf4" }}>{kelas.code}</span>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px" }}>
-        <MiniStat label="Total Record" value={filteredCount.toLocaleString("id-ID")} icon={<Archive size={15} style={{ color: "#34D399" }} />} />
-        <MiniStat label="Sesi Tersedia" value={String(MOCK_SESSIONS.length)} icon={<Calendar size={15} style={{ color: "#34D399" }} />} />
-        <MiniStat label="Export Terakhir" value="Hari Ini" icon={<Clock size={15} style={{ color: "#34D399" }} />} />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "20px" }} className="export-grid">
-        {/* ── KIRI: Form Konfigurasi ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {/* Tipe Laporan */}
-          <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <ClipboardList size={16} style={{ color: "#34D399" }} /> Tipe Laporan
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {REPORT_TYPES.map((t) => (
-                <label key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "12px 14px", borderRadius: "12px", cursor: "pointer", transition: "all 0.2s",
-                  background: reportType === t.id ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${reportType === t.id ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.05)"}`,
-                }}>
-                  <div style={{ marginTop: "2px", width: 16, height: 16, borderRadius: "50%", border: `2px solid ${reportType === t.id ? "#10B981" : "rgba(16,185,129,0.3)"}`, background: reportType === t.id ? "#10B981" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {reportType === t.id && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
-                  </div>
-                  <input type="radio" name="reportType" value={t.id} checked={reportType === t.id} onChange={() => setReportType(t.id)} style={{ display: "none" }} />
-                  <div>
-                    <p style={{ fontSize: "13px", fontWeight: 600, color: reportType === t.id ? "#34D399" : "#f0fdf4" }}>{t.label}</p>
-                    <p style={{ fontSize: "12px", color: "rgba(110,231,183,0.4)", marginTop: "2px" }}>{t.desc}</p>
-                  </div>
-                </label>
-              ))}
+      {/* Class Header */}
+      <div className="glass rounded-2xl" style={{ padding: "24px 28px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ width: 52, height: 52, borderRadius: "14px", background: "linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.1))", border: "1px solid rgba(16,185,129,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <FlaskConical size={24} style={{ color: "#34D399" }} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" }}>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#f0fdf4" }}>{kelas.name}</h1>
+                <span style={{ fontSize: "12px", fontWeight: 700, padding: "2px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: "#34D399", border: "1px solid rgba(16,185,129,0.2)" }}>
+                  {kelas.code}
+                </span>
+                {activeSessions.length > 0 && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, padding: "2px 9px", borderRadius: "20px", background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f87171", animation: "pulse-dot 1.5s ease-in-out infinite", display: "inline-block" }} />
+                    LIVE
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+                {kelas.semester && <span style={{ fontSize: "13px", color: "rgba(110,231,183,0.45)" }}>{kelas.semester}</span>}
+                {kelas.location && (
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "13px", color: "rgba(110,231,183,0.45)" }}>
+                    <MapPin size={12} /> {kelas.location}
+                  </span>
+                )}
+                {kelas.my_peran && (
+                  <span style={{ fontSize: "11px", padding: "1px 8px", borderRadius: "20px", background: "rgba(16,185,129,0.08)", color: "#34D399", border: "1px solid rgba(16,185,129,0.15)", fontWeight: 600 }}>
+                    {kelas.my_peran}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Filter */}
-          <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <SlidersHorizontal size={16} style={{ color: "#34D399" }} /> Filter Data
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Sesi Praktikum</label>
-                <div style={{ position: "relative" }}>
-                  <select className="select-glass" value={selectedSession} onChange={(e) => setSelectedSession(e.target.value)}>
-                    {SESSIONS_CHOICE.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <ChevronDown size={14} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(110,231,183,0.3)", pointerEvents: "none" }} />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Dari Tanggal</label>
-                  <input type="date" className="input-glass" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Sampai Tanggal</label>
-                  <input type="date" className="input-glass" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                </div>
-              </div>
-            </div>
+          <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+            <button onClick={fetchKelas} style={{ padding: "8px 12px", borderRadius: "10px", background: "transparent", border: "1px solid rgba(16,185,129,0.2)", color: "rgba(110,231,183,0.5)", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+              <RefreshCw size={13} />
+            </button>
+            {isDosen && (
+              <button onClick={() => setShowCreateSession(true)} className="btn-primary rounded-xl" style={{ gap: "8px", padding: "10px 16px", fontSize: "13px" }}>
+                <Plus size={14} /> Tambah Sesi
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ── KANAN: Export Actions ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {/* Export Buttons */}
-          <div className="glass-strong rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "15px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Download size={16} style={{ color: "#34D399" }} /> Unduh Data
-            </h3>
-            <p style={{ fontSize: "12px", color: "rgba(110,231,183,0.4)", marginBottom: "18px" }}>
-              Format yang tersedia
+        {/* Stats row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginTop: "20px" }}>
+          {[
+            {
+              label: "Mahasiswa", value: kelas.enrollment_count,
+              href: isDosen ? `/dashboard/kelas/${classId}/enrollments` : undefined,
+              icon: <Users size={13} style={{ color: "#34D399" }} />,
+            },
+            { label: "Total Sesi", value: `${completedSessions.length}/${kelas.total_sessions_planned}`, icon: <CalendarDays size={13} style={{ color: "#34D399" }} /> },
+            { label: "Min Kehadiran", value: `${minPct}%`, icon: <CheckCircle size={13} style={{ color: "#34D399" }} /> },
+            { label: "Sesi Aktif", value: activeSessions.length, icon: <Radio size={13} style={{ color: activeSessions.length > 0 ? "#f87171" : "#34D399" }} /> },
+          ].map((s) => (
+            <div key={s.label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.1)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                {s.icon}
+                <span style={{ fontSize: "10px", color: "rgba(110,231,183,0.4)" }}>{s.label}</span>
+              </div>
+              {s.href ? (
+                <Link href={s.href} style={{ fontSize: "20px", fontWeight: 700, color: "#34D399", fontVariantNumeric: "tabular-nums", textDecoration: "none" }}>
+                  {s.value} →
+                </Link>
+              ) : (
+                <p style={{ fontSize: "20px", fontWeight: 700, color: "#f0fdf4", fontVariantNumeric: "tabular-nums" }}>{s.value}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sessions List */}
+      <div className="glass rounded-2xl" style={{ overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(16,185,129,0.1)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ fontSize: "13px", fontWeight: 700, color: "#10B981", letterSpacing: "0.07em" }}>
+            DAFTAR SESI ({kelas.sessions.length})
+          </h2>
+        </div>
+
+        {kelas.sessions.length === 0 ? (
+          <div style={{ padding: "48px 24px", textAlign: "center" }}>
+            <CalendarDays size={36} style={{ color: "rgba(74,222,128,0.2)", margin: "0 auto 12px" }} />
+            <p style={{ color: "rgba(110,231,183,0.4)", fontSize: "14px" }}>
+              Belum ada sesi.{isDosen && <> Klik <strong style={{ color: "#34D399" }}>Tambah Sesi</strong> untuk mulai.</>}
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {/* CSV */}
-              <button
-                onClick={handleExportCSV}
-                disabled={exporting}
-                style={{
-                  display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: exporting ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: exporting ? 0.7 : 1,
-                  background: exported ? "rgba(16,185,129,0.15)" : "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.08))",
-                  border: `1px solid ${exported ? "rgba(16,185,129,0.4)" : "rgba(16,185,129,0.25)"}`,
-                  width: "100%",
-                }}
+          </div>
+        ) : (
+          <div>
+            {kelas.sessions.map((sess) => (
+              <Link
+                key={sess.id}
+                href={`/dashboard/kelas/${classId}/sesi/${sess.id}`}
+                style={{ textDecoration: "none", display: "block" }}
               >
-                {exported
-                  ? <CheckCircle size={22} style={{ color: "#34D399", flexShrink: 0 }} />
-                  : exporting
-                    ? <div style={{ width: 22, height: 22, border: "2px solid rgba(16,185,129,0.3)", borderTop: "2px solid #10B981", borderRadius: "50%", animation: "spin-ring 0.8s linear infinite", flexShrink: 0 }} />
-                    : <FileSpreadsheet size={22} style={{ color: "#34D399", flexShrink: 0 }} />
-                }
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 600, color: "#f0fdf4" }}>
-                    {exported ? "Berhasil Diunduh!" : exporting ? "Mengekspor..." : "Export CSV"}
-                  </p>
-                  <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
-                    Kompatibel dengan Microsoft Excel
-                  </p>
-                </div>
-                {!exporting && !exported && <ArrowRight size={16} style={{ color: "rgba(110,231,183,0.4)", marginLeft: "auto" }} />}
-              </button>
-
-              {/* PDF (coming soon) */}
-              <button disabled style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: "not-allowed", opacity: 0.4, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", width: "100%" }}>
-                <FileText size={22} style={{ color: "rgba(110,231,183,0.4)", flexShrink: 0 }} />
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 600, color: "#f0fdf4" }}>Export PDF</p>
-                  <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.3)" }}>Segera hadir</p>
-                </div>
-              </button>
-
-              {/* Print */}
-              <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: "pointer", transition: "all 0.2s", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", width: "100%" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(16,185,129,0.2)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}>
-                <Printer size={22} style={{ color: "rgba(110,231,183,0.5)", flexShrink: 0 }} />
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 600, color: "#f0fdf4" }}>Cetak Laporan</p>
-                  <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.3)" }}>Buka dialog print browser</p>
-                </div>
-                <ArrowRight size={16} style={{ color: "rgba(110,231,183,0.3)", marginLeft: "auto" }} />
-              </button>
-            </div>
-          </div>
-
-          {/* Recent Exports */}
-          <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "14px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <History size={15} style={{ color: "#34D399" }} /> Riwayat Export
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {RECENT.map((r) => (
-                <div key={r.filename} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                  <FileSpreadsheet size={14} style={{ color: "#34D399", flexShrink: 0 }} />
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "16px", padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "background 0.15s, box-shadow 0.15s", cursor: "pointer" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(16,185,129,0.04)"; (e.currentTarget as HTMLElement).style.boxShadow = "inset 3px 0 0 #10B981"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
+                >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: "12px", fontWeight: 600, color: "#f0fdf4", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.filename}</p>
-                    <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.35)" }}>{r.date} · {r.size}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                      <p style={{ fontSize: "13px", fontWeight: 600, color: "#f0fdf4" }}>{sess.title}</p>
+                      <SessionStatusBadge sess={sess} />
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
+                        <CalendarDays size={11} />
+                        {new Date(sess.session_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                      </span>
+                      {sess.location && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
+                          <MapPin size={11} /> {sess.location}
+                        </span>
+                      )}
+                      {sess.is_active && sess.expires_at && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#f87171" }}>
+                          <Clock size={11} /> Berakhir {new Date(sess.expires_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <CheckCircle size={13} style={{ color: "#34D399", flexShrink: 0 }} />
+                  <span style={{ fontSize: "12px", color: "rgba(110,231,183,0.3)" }}>→</span>
                 </div>
-              ))}
-            </div>
+              </Link>
+            ))}
           </div>
-        </div>
+        )}
       </div>
+
+      {showCreateSession && (
+        <CreateSessionModal
+          classId={classId}
+          onClose={() => setShowCreateSession(false)}
+          onSuccess={handleSessionCreated}
+        />
+      )}
 
       <style>{`
-        @media (max-width: 900px) { .export-grid { grid-template-columns: 1fr !important; } }
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.8); }
+        }
       `}</style>
     </div>
   );

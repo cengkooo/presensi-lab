@@ -5,7 +5,7 @@
 // ======================================================
 import { NextRequest } from "next/server"
 import { z } from "zod"
-import { ok, err, E, getAuthUser, getUserRole } from "@/lib/apiHelpers"
+import { ok, err, E, getAuthUser, getUserRole, isStaffRole } from "@/lib/apiHelpers"
 import { createSupabaseServiceClient } from "@/lib/supabase/server"
 
 const schema = z.object({
@@ -42,12 +42,13 @@ export async function POST(request: NextRequest) {
   if (sessionErr || !session) return err(E.NOT_FOUND, "Sesi tidak ditemukan.", 404)
   if (!session.is_active)     return err(E.SESSION_INACTIVE, "Sesi sudah tidak aktif.", 400)
 
-  // 4. Cek autoritas: harus yang mengaktifkan, atau admin
+  // 4. Cek autoritas: harus staff DAN (yang mengaktifkan atau admin)
   const role = await getUserRole(user.id)
+  const isStaff     = isStaffRole(role)
   const isActivator = session.activated_by === user.id
   const isAdmin     = role === "admin"
 
-  if (!isActivator && !isAdmin) {
+  if (!isStaff || (!isActivator && !isAdmin)) {
     return err(E.FORBIDDEN, "Hanya yang mengaktifkan sesi atau admin yang bisa menonaktifkan.", 403)
   }
 

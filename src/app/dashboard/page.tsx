@@ -10,6 +10,7 @@ import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
 import { SessionManager } from "@/components/dashboard/SessionManager";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
 type ActivateState = "idle" | "active" | "expired";
 
@@ -60,6 +61,10 @@ export default function DashboardPage() {
   const [activeSessId,  setActiveSessId]  = useState<string | null>(null);
   const { toasts, toast, dismissToast } = useToast();
   const { stats } = useDashStats();
+  const { profile } = useSupabaseSession();
+
+  const role    = profile?.role ?? "mahasiswa";
+  const isStaff = role === "dosen" || role === "asisten" || role === "admin";
 
   return (
     <div
@@ -99,7 +104,7 @@ export default function DashboardPage() {
         <button
           onClick={() => toast.success("Gunakan panel Manajemen Sesi di bawah.")}
           style={{
-            display: "flex",
+            display: isStaff ? "flex" : "none",
             alignItems: "center",
             gap: "8px",
             padding: "10px 18px",
@@ -135,31 +140,35 @@ export default function DashboardPage() {
         <StatCard icon={<Clock size={18} style={{ color: "#34D399" }} />} label="Hari Ini" value={String(stats.hariIni)} trend={8} />
       </div>
 
-      {/* ── ACTIVATE + LIVE FEED ── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "16px",
-          marginBottom: "24px",
-        }}
-        className="two-col-grid"
-      >
-        <ActivateAttendance
-          onStateChange={(s, sid) => {
-            setActivateState(s);
-            setActiveSessId(sid ?? null);
-            if (s === "active") toast.success("Sesi absensi berhasil diaktifkan!");
-            if (s === "expired") toast.warning("Sesi absensi telah berakhir.");
+      {/* ── ACTIVATE + LIVE FEED (staff only) ── */}
+      {isStaff && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "16px",
+            marginBottom: "24px",
           }}
-        />
-        <LiveAttendanceList isActive={activateState === "active"} sessionId={activeSessId} />
-      </div>
+          className="two-col-grid"
+        >
+          <ActivateAttendance
+            onStateChange={(s, sid) => {
+              setActivateState(s);
+              setActiveSessId(sid ?? null);
+              if (s === "active") toast.success("Sesi absensi berhasil diaktifkan!");
+              if (s === "expired") toast.warning("Sesi absensi telah berakhir.");
+            }}
+          />
+          <LiveAttendanceList isActive={activateState === "active"} sessionId={activeSessId} />
+        </div>
+      )}
 
-      {/* ── SESSION MANAGER ── */}
-      <div style={{ marginBottom: "24px" }}>
-        <SessionManager />
-      </div>
+      {/* ── SESSION MANAGER (staff only) ── */}
+      {isStaff && (
+        <div style={{ marginBottom: "24px" }}>
+          <SessionManager />
+        </div>
+      )}
 
       {/* ── ATTENDANCE TABLE ── */}
       <div>

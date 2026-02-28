@@ -6,6 +6,8 @@ import {
   Eye, EyeOff, Copy, CheckCircle, AlertTriangle,
   Globe, Lock, Sliders,
 } from "lucide-react";
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 /* ── SECTION WRAPPER ── */
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
@@ -49,6 +51,10 @@ function Toggle({ enabled, onChange, label, desc }: { enabled: boolean; onChange
 
 /* ── MAIN ── */
 export default function SettingsPage() {
+  const { profile, loading: authLoading } = useSupabaseSession();
+  const role    = profile?.role ?? "mahasiswa";
+  const isStaff = role === "dosen" || role === "asisten" || role === "admin";
+
   // Geolocation
   const [defaultRadius, setDefaultRadius] = useState(100);
   const [defaultDuration, setDefaultDuration] = useState(30);
@@ -80,6 +86,27 @@ export default function SettingsPage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
+
+  // ── Loading / Access Guard ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!isStaff) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "32px" }}>
+        <div style={{ fontSize: "40px" }}>🔒</div>
+        <h2 style={{ color: "#f0fdf4", fontSize: "18px", fontWeight: 700 }}>Akses Dibatasi</h2>
+        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", textAlign: "center" }}>
+          Halaman ini hanya dapat diakses oleh dosen dan asisten.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", padding: "28px 32px 48px", boxSizing: "border-box" }}>
