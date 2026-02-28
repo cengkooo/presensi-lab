@@ -210,7 +210,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
               className="text-sm py-2.5 rounded-xl"
             >
               <Navigation size={14} />
-              {gpsLoading ? "Mengambil lokasi..." : "📍 Gunakan Lokasi Saya"}
+              {gpsLoading ? "Mengambil lokasi..." : " Gunakan Lokasi Saya"}
             </GlassButton>
             {gpsCoords && (
               <div
@@ -233,7 +233,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
             fullWidth
             className="py-3 rounded-xl"
           >
-            🟢 Aktifkan Absensi
+             Aktifkan Absensi
           </GlassButton>
         </div>
       )}

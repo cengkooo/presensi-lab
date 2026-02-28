@@ -13,211 +13,261 @@ import {
   Menu,
   X,
   FlaskConical,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+const navMain = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/kelas", label: "Kelas Praktikum", icon: BookOpen },
   { href: "/dashboard/sesi", label: "Sesi Praktikum", icon: Clock },
   { href: "/dashboard/mahasiswa", label: "Mahasiswa", icon: Users },
   { href: "/dashboard/export", label: "Export Data", icon: Download },
 ];
 
-const managementItems = [
+const navMgmt = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-const MOCK_ADMIN = {
-  name: "Alex Rivera",
-  role: "Head Coordinator",
-  initial: "AR",
-};
+const ADMIN = { name: "Alex Rivera", role: "Head Coordinator", initial: "AR" };
 
-interface SidebarProps {
-  className?: string;
-}
-
-export function Sidebar({ className }: SidebarProps) {
+function SidebarContent({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const NavLink = ({
+  const NavItem = ({
     href,
     label,
-    icon: Icon,
+    Icon,
   }: {
     href: string;
     label: string;
-    icon: React.ElementType;
+    Icon: React.ElementType;
   }) => {
-    const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+    const active =
+      pathname === href ||
+      (href !== "/dashboard" && pathname.startsWith(href));
     return (
       <Link
         href={href}
-        className={cn(
-          "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-          isActive
-            ? "text-white"
-            : "hover:text-green-400 hover:bg-white/5"
-        )}
+        onClick={onClose}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
         style={
-          isActive
+          active
             ? {
-                background: "linear-gradient(135deg, rgba(22,163,74,0.3), rgba(34,197,94,0.15))",
-                border: "1px solid rgba(34,197,94,0.25)",
+                background:
+                  "linear-gradient(135deg, rgba(22,163,74,0.25), rgba(34,197,94,0.12))",
+                border: "1px solid rgba(34,197,94,0.3)",
                 color: "#4ade80",
               }
-            : { color: "var(--text-muted)" }
+            : {
+                color: "rgba(134,239,172,0.5)",
+                border: "1px solid transparent",
+              }
         }
-        onClick={() => setMobileOpen(false)}
+        onMouseEnter={(e) => {
+          if (!active) {
+            (e.currentTarget as HTMLElement).style.color = "#4ade80";
+            (e.currentTarget as HTMLElement).style.background =
+              "rgba(255,255,255,0.04)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            (e.currentTarget as HTMLElement).style.color =
+              "rgba(134,239,172,0.5)";
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+          }
+        }}
       >
-        <Icon size={18} />
-        {label}
+        <Icon size={17} />
+        <span>{label}</span>
       </Link>
     );
   };
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+  return (
+    <div
+      className="flex flex-col h-full"
+      style={{
+        background: "rgba(3,12,6,0.96)",
+        backdropFilter: "blur(24px)",
+        borderRight: "1px solid rgba(34,197,94,0.12)",
+      }}
+    >
       {/* Logo */}
-      <div className="px-4 py-5 border-b" style={{ borderColor: "var(--border-glass)" }}>
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex items-center justify-center w-9 h-9 rounded-xl"
+      <div
+        className="flex items-center gap-3 px-5 py-5"
+        style={{ borderBottom: "1px solid rgba(34,197,94,0.1)" }}
+      >
+        <div
+          className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+          style={{
+            background: "linear-gradient(135deg, #15803d, #22c55e)",
+            boxShadow: "0 0 16px rgba(34,197,94,0.4)",
+          }}
+        >
+          <FlaskConical size={17} color="#fff" />
+        </div>
+        <div>
+          <p
+            className="font-bold text-sm leading-tight"
             style={{
-              background: "linear-gradient(135deg, #15803d, #22c55e)",
-              boxShadow: "0 0 16px rgba(34,197,94,0.35)",
+              background: "linear-gradient(135deg, #22c55e, #bbf7d0)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
             }}
           >
-            <FlaskConical size={18} color="#fff" />
-          </div>
-          <div>
-            <p className="font-bold text-base text-gradient-green leading-none">
-              PresensLab
-            </p>
-            <p className="text-xs tracking-widest mt-0.5" style={{ color: "var(--text-muted)" }}>
-              ADMIN CONTROL
-            </p>
-          </div>
+            PresensLab
+          </p>
+          <p
+            className="text-xs tracking-widest font-semibold leading-tight mt-0.5"
+            style={{ color: "rgba(134,239,172,0.4)", fontSize: "9px" }}
+          >
+            ADMIN CONTROL
+          </p>
         </div>
       </div>
 
-      {/* Nav Links */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink key={item.href} {...item} />
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {navMain.map((item) => (
+          <NavItem key={item.href} href={item.href} label={item.label} Icon={item.icon} />
         ))}
-
         <div
-          className="pt-4 mt-4 border-t"
-          style={{ borderColor: "var(--border-glass)" }}
+          className="pt-5 mt-4"
+          style={{ borderTop: "1px solid rgba(34,197,94,0.08)" }}
         >
           <p
-            className="px-3 pb-2 text-xs font-semibold tracking-widest uppercase"
-            style={{ color: "var(--text-muted)" }}
+            className="px-3 pb-2 text-xs font-bold tracking-widest uppercase"
+            style={{ color: "rgba(134,239,172,0.3)", fontSize: "9px" }}
           >
             Management
           </p>
-          {managementItems.map((item) => (
-            <NavLink key={item.href} {...item} />
+          {navMgmt.map((item) => (
+            <NavItem key={item.href} href={item.href} label={item.label} Icon={item.icon} />
           ))}
         </div>
       </nav>
 
-      {/* User Info */}
+      {/* User */}
       <div
-        className="px-3 py-4 border-t"
-        style={{ borderColor: "var(--border-glass)" }}
+        className="px-3 py-4"
+        style={{ borderTop: "1px solid rgba(34,197,94,0.08)" }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl"
+          style={{ background: "rgba(34,197,94,0.05)" }}>
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
             style={{
-              background: "linear-gradient(135deg, #1e3a1e, #2d5a2d)",
-              border: "1px solid rgba(34,197,94,0.2)",
+              background: "linear-gradient(135deg, #1a3a1a, #2a5a2a)",
+              border: "1px solid rgba(34,197,94,0.25)",
               color: "#4ade80",
             }}
           >
-            {MOCK_ADMIN.initial}
+            {ADMIN.initial}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-              {MOCK_ADMIN.name}
+            <p className="text-xs font-semibold truncate" style={{ color: "#e2f5e8" }}>
+              {ADMIN.name}
             </p>
-            <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-              {MOCK_ADMIN.role}
+            <p className="text-xs truncate" style={{ color: "rgba(134,239,172,0.4)" }}>
+              {ADMIN.role}
             </p>
           </div>
           <button
-            className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: "var(--text-muted)" }}
+            className="p-1.5 rounded-lg flex-shrink-0 transition-opacity hover:opacity-70"
+            style={{ color: "rgba(134,239,172,0.4)" }}
             title="Keluar"
           >
-            <LogOut size={14} />
+            <LogOut size={13} />
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+export function Sidebar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* === DESKTOP SIDEBAR === */}
       <aside
-        className={cn(
-          "hidden md:flex flex-col fixed left-0 top-0 h-screen w-[220px] z-30",
-          "glass-strong",
-          className
-        )}
+        className="hidden md:block fixed top-0 left-0 h-screen z-40"
+        style={{ width: "220px" }}
       >
         <SidebarContent />
       </aside>
 
-      {/* Mobile: Hamburger Button */}
+      {/* === MOBILE HAMBURGER === */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-xl glass"
-        onClick={() => setMobileOpen(!mobileOpen)}
-        style={{ color: "var(--text-primary)" }}
+        className="md:hidden fixed top-3 left-3 z-50 w-9 h-9 flex items-center justify-center rounded-xl"
+        onClick={() => setMobileOpen(true)}
+        style={{
+          background: "rgba(5,20,10,0.9)",
+          border: "1px solid rgba(34,197,94,0.2)",
+          color: "#4ade80",
+        }}
       >
-        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+        <Menu size={18} />
       </button>
 
-      {/* Mobile Overlay */}
+      {/* === MOBILE OVERLAY === */}
       {mobileOpen && (
         <div
           className="md:hidden fixed inset-0 z-40"
-          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+          style={{ background: "rgba(0,0,0,0.75)" }}
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Mobile Drawer */}
+      {/* === MOBILE DRAWER === */}
       <aside
         className={cn(
-          "md:hidden fixed left-0 top-0 h-screen w-[220px] z-50 glass-strong transition-transform duration-300",
+          "md:hidden fixed top-0 left-0 h-screen z-50 transition-transform duration-300 ease-out",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
+        style={{ width: "220px" }}
       >
-        <SidebarContent />
+        <button
+          className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-lg"
+          onClick={() => setMobileOpen(false)}
+          style={{
+            background: "rgba(34,197,94,0.1)",
+            color: "#4ade80",
+          }}
+        >
+          <X size={14} />
+        </button>
+        <SidebarContent onClose={() => setMobileOpen(false)} />
       </aside>
 
-      {/* Mobile Bottom Nav */}
+      {/* === MOBILE BOTTOM NAV === */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-2 py-2 glass-strong"
-        style={{ borderTop: "1px solid var(--border-glass)" }}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30"
+        style={{
+          background: "rgba(3,12,6,0.96)",
+          borderTop: "1px solid rgba(34,197,94,0.12)",
+          backdropFilter: "blur(20px)",
+        }}
       >
-        <div className="flex justify-around">
-          {navItems.slice(0, 4).map((item) => {
+        <div className="flex justify-around py-2">
+          {navMain.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const active =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: isActive ? "var(--green-brand)" : "var(--text-muted)" }}
+                className="flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl"
+                style={{ color: active ? "#4ade80" : "rgba(134,239,172,0.4)" }}
               >
-                <Icon size={20} />
+                <Icon size={19} />
                 <span className="text-xs">{item.label.split(" ")[0]}</span>
               </Link>
             );

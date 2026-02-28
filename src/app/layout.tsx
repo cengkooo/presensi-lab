@@ -4,7 +4,9 @@ import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-inter",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +26,9 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#020d06" />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
+        {children}
+      </body>
     </html>
   );
 }
