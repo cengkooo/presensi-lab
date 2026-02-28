@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   MapPin,
   Clock,
@@ -15,31 +15,83 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type ActivateState = "idle" | "active" | "expired";
 
-const MOCK_SESSIONS = [
-  { id: "s1", title: "Praktikum Jaringan - A1" },
-  { id: "s2", title: "Basis Data - B2" },
-  { id: "s3", title: "Sistem Operasi - C1" },
-  { id: "s4", title: "Kecerdasan Buatan - A2" },
-];
+interface AvailableSession {
+  id: string;
+  title: string;
+  class_name: string;
+}
 
 interface ActivateAttendanceProps {
   onStateChange?: (state: ActivateState) => void;
 }
 
 export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
-  const [state, setState] = useState<ActivateState>("idle");
-  const [selectedSession, setSelectedSession] = useState(MOCK_SESSIONS[0].id);
-  const [radius, setRadius] = useState(100);
+  const [state, setState]       = useState<ActivateState>("idle");
+  const [sessions, setSessions] = useState<AvailableSession[]>([]);
+  const [sessLoading, setSessLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState("");
+  const [radius, setRadius]     = useState(100);
   const [duration, setDuration] = useState(30);
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
-  const [expiresAt, setExpiresAt] = useState<Date>(new Date());
+  const [gpsCoords, setGpsCoords]   = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [expiresAt, setExpiresAt]   = useState<Date>(new Date());
   const [attendeeCount, setAttendeeCount] = useState(0);
+  const [activeSessId, setActiveSessId]   = useState<string | null>(null);
   const [activeSessTitle, setActiveSessTitle] = useState("");
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Fetch available (inactive) sessions ──────────────────────
+  useEffect(() => {
+    setSessLoading(true);
+    const supabase = createSupabaseBrowserClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Promise.resolve((supabase as any)
+      .from("sessions")
+      .select("id, title, classes ( name )")
+      .eq("is_active", false)
+      .order("created_at", { ascending: false })
+      .limit(50)
+    ).then(({ data }: { data: Array<{ id: string; title: string; classes: { name: string } | null }> | null }) => {
+        if (data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const mapped: AvailableSession[] = data.map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            class_name: s.classes?.name ?? "",
+          }));
+          setSessions(mapped);
+          if (mapped.length > 0) setSelectedSession(mapped[0].id);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSessLoading(false));
+  }, [activeSessId]); // refetch when a session is deactivated
+
+  // ── Poll attendee count while active ─────────────────────────
+  useEffect(() => {
+    if (state !== "active" || !activeSessId) return;
+
+    const supabase = createSupabaseBrowserClient();
+    const poll = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Promise.resolve((supabase as any)
+        .from("attendance")
+        .select("id", { count: "exact", head: true })
+        .eq("session_id", activeSessId)
+      ).then(({ count }: { count: number | null }) => {
+        if (count != null) setAttendeeCount(count);
+      });
+    };
+    poll();
+    pollRef.current = setInterval(poll, 10_000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [state, activeSessId]);
 
   const getGps = useCallback(() => {
     setGpsLoading(true);
@@ -58,7 +110,6 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
         setGpsLoading(false);
       },
       () => {
-        // Demo fallback
         setGpsCoords({ lat: -6.914744, lng: 107.60981, accuracy: 15 });
         setGpsLoading(false);
       },
@@ -66,53 +117,90 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
     );
   }, []);
 
-  const handleActivate = useCallback(() => {
-    const sess = MOCK_SESSIONS.find((s) => s.id === selectedSession);
-    if (!gpsCoords) {
-      alert("Ambil lokasi GPS terlebih dahulu!");
-      return;
+  const handleActivate = useCallback(async () => {
+    if (!gpsCoords) { alert("Ambil lokasi GPS terlebih dahulu!"); return; }
+    if (!selectedSession) { alert("Pilih sesi terlebih dahulu!"); return; }
+
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/sessions/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: selectedSession,
+          lat:         gpsCoords.lat,
+          lng:         gpsCoords.lng,
+          radius_meter: radius,
+          duration_minutes: duration,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.message ?? "Gagal mengaktifkan sesi.");
+        return;
+      }
+      const sess = sessions.find((s) => s.id === selectedSession);
+      const label = sess ? `${sess.title} — ${sess.class_name}` : "Sesi Aktif";
+      setActiveSessId(selectedSession);
+      setActiveSessTitle(label);
+      setExpiresAt(new Date(json.data.expires_at));
+      setAttendeeCount(0);
+      setState("active");
+      onStateChange?.("active");
+    } catch {
+      alert("Gagal terhubung ke server.");
+    } finally {
+      setActionLoading(false);
     }
-    const exp = new Date(Date.now() + duration * 60 * 1000);
-    setExpiresAt(exp);
-    setActiveSessTitle(sess?.title ?? "");
-    setAttendeeCount(0);
-    setState("active");
-    onStateChange?.("active");
-    // TODO: call POST /api/sessions/activate
-  }, [gpsCoords, selectedSession, duration, onStateChange]);
+  }, [gpsCoords, selectedSession, radius, duration, sessions, onStateChange]);
 
-  const handleExtend = useCallback(() => {
-    setExpiresAt((prev) => new Date(prev.getTime() + 15 * 60 * 1000));
-    // TODO: call POST /api/sessions/extend
-  }, []);
+  const handleExtend = useCallback(async () => {
+    if (!activeSessId) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/sessions/extend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: activeSessId, extend_minutes: 15 }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setExpiresAt(new Date(json.data.expires_at));
+      }
+    } catch {/* silent */} finally {
+      setActionLoading(false);
+    }
+  }, [activeSessId]);
 
-  const handleDeactivate = useCallback(() => {
+  const handleDeactivate = useCallback(async () => {
+    if (!activeSessId) return;
     setShowDeactivateConfirm(false);
-    setState("expired");
-    onStateChange?.("expired");
-    // TODO: call POST /api/sessions/deactivate
-  }, [onStateChange]);
+    setActionLoading(true);
+    try {
+      await fetch("/api/sessions/deactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: activeSessId }),
+      });
+    } catch {/* silent */} finally {
+      setActionLoading(false);
+      setActiveSessId(null);
+      setState("expired");
+      onStateChange?.("expired");
+    }
+  }, [activeSessId, onStateChange]);
 
   const handleExpired = useCallback(() => {
     setState("expired");
     onStateChange?.("expired");
   }, [onStateChange]);
 
-  // Simulate live attendees incrementing
-  useEffect(() => {
-    if (state !== "active") return;
-    const t = setInterval(() => {
-      setAttendeeCount((p) => Math.min(p + 1, 32));
-    }, 5000);
-    return () => clearInterval(t);
-  }, [state]);
-
   return (
     <GlassCard variant="strong" className="p-5">
       <div className="flex items-center gap-2.5 mb-4">
         <div
           className="flex items-center justify-center w-8 h-8 rounded-lg"
-          style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.25)" }}
+          style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.25)" }}
         >
           <Radio size={16} style={{ color: "var(--green-brand)" }} />
         </div>
@@ -150,24 +238,35 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
             <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-muted)" }}>
               Pilih Sesi
             </label>
-            <div className="relative">
-              <select
-                className="select-glass pr-8"
-                value={selectedSession}
-                onChange={(e) => setSelectedSession(e.target.value)}
-              >
-                {MOCK_SESSIONS.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: "var(--text-muted)" }}
-              />
-            </div>
+            {sessLoading ? (
+              <div className="flex items-center gap-2 py-2">
+                <LoadingSpinner size="sm" />
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>Memuat sesi...</span>
+              </div>
+            ) : sessions.length === 0 ? (
+              <p className="text-xs py-2" style={{ color: "rgba(110,231,183,0.4)" }}>
+                Tidak ada sesi tersedia. Buat sesi baru di halaman Kelas.
+              </p>
+            ) : (
+              <div className="relative">
+                <select
+                  className="select-glass pr-8"
+                  value={selectedSession}
+                  onChange={(e) => setSelectedSession(e.target.value)}
+                >
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}{s.class_name ? ` — ${s.class_name}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: "var(--text-muted)" }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Radius + Duration */}
@@ -217,7 +316,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
                 className="mt-2 px-3 py-2 rounded-xl text-xs"
                 style={{
                   background: "rgba(5,46,22,0.4)",
-                  border: "1px solid rgba(34,197,94,0.2)",
+                  border: "1px solid rgba(16,185,129,0.2)",
                   color: "var(--text-secondary)",
                 }}
               >
@@ -230,6 +329,8 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
           <GlassButton
             variant="primary"
             onClick={handleActivate}
+            loading={actionLoading}
+            disabled={sessions.length === 0 || sessLoading}
             fullWidth
             className="py-3 rounded-xl"
           >
@@ -246,7 +347,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
             className="rounded-xl p-3"
             style={{
               background: "rgba(5,46,22,0.35)",
-              border: "1px solid rgba(34,197,94,0.2)",
+              border: "1px solid rgba(16,185,129,0.2)",
             }}
           >
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>Sesi Aktif</p>
@@ -265,7 +366,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>Sudah hadir</p>
               <div className="flex items-center gap-1.5 justify-end">
                 <Users size={14} style={{ color: "var(--green-brand)" }} />
-                <span className="text-xl font-bold tabular-nums" style={{ color: "#4ade80" }}>
+                <span className="text-xl font-bold tabular-nums" style={{ color: "#34D399" }}>
                   {attendeeCount}
                 </span>
               </div>
@@ -278,7 +379,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
               style={{
                 background: "rgba(5,46,22,0.3)",
-                border: "1px solid rgba(34,197,94,0.15)",
+                border: "1px solid rgba(16,185,129,0.15)",
                 color: "var(--text-muted)",
               }}
             >
@@ -295,6 +396,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
             <GlassButton
               variant="ghost"
               onClick={handleExtend}
+              loading={actionLoading}
               className="flex-1 text-xs py-2"
             >
               <Plus size={12} /> +15 Menit
@@ -361,7 +463,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
             </p>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
               Total hadir:{" "}
-              <span className="font-bold" style={{ color: "#4ade80" }}>
+              <span className="font-bold" style={{ color: "#34D399" }}>
                 {attendeeCount} mahasiswa
               </span>
             </p>
@@ -372,6 +474,7 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
               setState("idle");
               setGpsCoords(null);
               setAttendeeCount(0);
+              setActiveSessId(null);
               onStateChange?.("idle");
             }}
             fullWidth

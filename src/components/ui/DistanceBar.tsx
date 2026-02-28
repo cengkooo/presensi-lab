@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export function DistanceBar({ actual, max, className }: DistanceBarProps) {
     ? "#f97316"
     : pct > 60
     ? "#eab308"
-    : "#22c55e";
+    : "#10B981";
 
   return (
     <div className={cn("w-full", className)}>
@@ -38,7 +38,7 @@ export function DistanceBar({ actual, max, className }: DistanceBarProps) {
           className="h-full rounded-full transition-all duration-700 ease-out"
           style={{
             width: `${pct}%`,
-            background: `linear-gradient(90deg, #22c55e, ${barColor})`,
+            background: `linear-gradient(90deg, #10B981, ${barColor})`,
             boxShadow: `0 0 8px ${barColor}60`,
           }}
         />

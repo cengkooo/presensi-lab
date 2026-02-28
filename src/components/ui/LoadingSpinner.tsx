@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { cn } from "@/lib/utils";
 
@@ -35,7 +35,7 @@ export function LoadingSpinner({
           cy={s.outer / 2}
           r={(s.outer - s.stroke * 2) / 2}
           fill="none"
-          stroke="rgba(34, 197, 94, 0.15)"
+          stroke="rgba(16, 185, 129, 0.15)"
           strokeWidth={s.stroke}
         />
         <circle
@@ -58,8 +58,8 @@ export function LoadingSpinner({
             x2="100%"
             y2="100%"
           >
-            <stop offset="0%" stopColor="#22c55e" />
-            <stop offset="100%" stopColor="#4ade80" />
+            <stop offset="0%" stopColor="#10B981" />
+            <stop offset="100%" stopColor="#34D399" />
           </linearGradient>
         </defs>
       </svg>

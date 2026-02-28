@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   MapPin,
   QrCode,
@@ -28,27 +29,8 @@ import { DistanceBar } from "@/components/ui/DistanceBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useToast } from "@/hooks/useToast";
-
-/* ============================================================
-   MOCK DATA — Akan diganti dengan API call
-   ============================================================ */
-const MOCK_USER = {
-  name: "Budi Setiawan",
-  email: "budi.s@stmik.ac.id",
-  avatarInitial: "BS",
-  isAdmin: true,
-};
-
-const MOCK_SESSION = {
-  id: "sess-001",
-  title: "Praktikum Jaringan",
-  date: "28 Februari 2026",
-  location: "Lab Komputer A, Gedung 4",
-  isActive: true,
-  radius: 100,
-  expiresAt: new Date(Date.now() + 25 * 60 * 1000),
-  bgImage: null as string | null,
-};
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /* ============================================================
    TYPES
@@ -74,6 +56,23 @@ interface GpsCoords {
   accuracy: number;
 }
 
+type ActiveSession = {
+  id: string;
+  title: string;
+  date: string;
+  location: string | null;
+  radius: number;
+  expiresAt: Date;
+  lat: number;
+  lng: number;
+};
+
+type UserInfo = {
+  name: string;
+  avatarInitial: string;
+  isAdmin: boolean;
+};
+
 /* ============================================================
    SUB-COMPONENTS
    ============================================================ */
@@ -84,8 +83,8 @@ function Logo() {
       <div
         className="flex items-center justify-center w-12 h-12 rounded-full"
         style={{
-          background: "linear-gradient(135deg, #15803d, #22c55e)",
-          boxShadow: "0 0 24px rgba(34,197,94,0.4)",
+          background: "linear-gradient(135deg, #059669, #10B981)",
+          boxShadow: "0 0 24px rgba(16,185,129,0.4)",
         }}
       >
         <span className="text-2xl">🧪</span>
@@ -106,7 +105,7 @@ function UserBar({
   user,
   onLogout,
 }: {
-  user: typeof MOCK_USER;
+  user: UserInfo;
   onLogout: () => void;
 }) {
   return (
@@ -120,7 +119,7 @@ function UserBar({
       <div
         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
         style={{
-          background: "linear-gradient(135deg, #15803d, #22c55e)",
+          background: "linear-gradient(135deg, #059669, #10B981)",
           color: "#fff",
         }}
       >
@@ -153,9 +152,11 @@ function SessionCard({
   session,
   children,
 }: {
-  session: typeof MOCK_SESSION;
+  session: ActiveSession;
   children: React.ReactNode;
 }) {
+  const locationLabel = session.location ?? "Lokasi tidak diset";
+
   return (
     <GlassCard variant="default" className="overflow-hidden">
       {/* Session header image area */}
@@ -165,23 +166,23 @@ function SessionCard({
           background:
             "linear-gradient(180deg, rgba(5,46,22,0.3) 0%, rgba(2,13,6,0.95) 100%), url('/api/placeholder/400/200') center/cover",
           backgroundImage:
-            "linear-gradient(135deg, #0a2010 0%, #051a0c 50%, #020d06 100%)",
+            "linear-gradient(135deg, #0a2010 0%, #051a0c 50%, #0B1F1A 100%)",
         }}
       >
         {/* Server rack decoration */}
         <div
           className="absolute inset-0 opacity-20"
           style={{
-            backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(34,197,94,0.15) 18px, rgba(34,197,94,0.15) 19px)`,
+            backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(16,185,129,0.15) 18px, rgba(16,185,129,0.15) 19px)`,
           }}
         />
         <div className="relative">
           <span
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tracking-wider mb-2"
             style={{
-              background: "rgba(34,197,94,0.15)",
-              border: "1px solid rgba(34,197,94,0.3)",
-              color: "#4ade80",
+              background: "rgba(16,185,129,0.15)",
+              border: "1px solid rgba(16,185,129,0.3)",
+              color: "#34D399",
             }}
           >
             <span
@@ -207,7 +208,7 @@ function SessionCard({
         </div>
         <div className="flex items-center gap-2.5 text-sm" style={{ color: "var(--text-secondary)" }}>
           <MapPin size={14} style={{ color: "var(--green-brand)" }} />
-          <span>{session.location}</span>
+          <span>{locationLabel}</span>
         </div>
         <div className="flex items-center gap-2.5 text-sm" style={{ color: "var(--text-muted)" }}>
           <Clock size={14} />
@@ -224,13 +225,75 @@ function SessionCard({
    MAIN LANDING PAGE
    ============================================================ */
 export default function HomePage() {
-  const [authState] = useState<AuthState>("logged-in"); // TODO: from NextAuth
+  const router = useRouter();
+  const { user, profile, loading: authLoading } = useSupabaseSession();
+
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
+
   const [checkinState, setCheckinState] = useState<CheckinState>("idle");
   const [gpsCoords, setGpsCoords] = useState<GpsCoords | null>(null);
   const [gpsFailCount, setGpsFailCount] = useState(0);
   const [checkedInAt, setCheckedInAt] = useState<string | null>(null);
   const [distanceResult, setDistanceResult] = useState<number | null>(null);
   const { toasts, toast, dismissToast } = useToast();
+
+  // Derived auth state
+  const authState: AuthState = authLoading
+    ? "loading"
+    : user
+    ? "logged-in"
+    : "not-logged-in";
+
+  // Build user info for UI
+  const userInfo: UserInfo = {
+    name: profile?.full_name ?? user?.email?.split("@")[0] ?? "User",
+    avatarInitial: (profile?.full_name ?? user?.email ?? "U")
+      .split(" ")
+      .map((w: string) => w[0] ?? "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase(),
+    isAdmin: profile?.role === "dosen" || profile?.role === "admin",
+  };
+
+  // Fetch active session when logged in
+  useEffect(() => {
+    if (authState !== "logged-in") return;
+
+    setSessionLoading(true);
+    fetch("/api/sessions/active", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          const s = json.data;
+          // Only show session if it has a valid GPS anchor
+          if (s.lat == null || s.lng == null) {
+            setActiveSession(null);
+            return;
+          }
+          setActiveSession({
+            id: s.id,
+            title: s.title ?? s.classes?.name ?? "Sesi Praktikum",
+            date: new Date(s.session_date ?? s.created_at).toLocaleDateString("id-ID", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            }),
+            location: s.location ?? s.classes?.location ?? null,
+            radius: s.radius_meter ?? 100,
+            expiresAt: new Date(s.expires_at),
+            lat: s.lat,
+            lng: s.lng,
+          });
+        } else {
+          setActiveSession(null);
+        }
+      })
+      .catch(() => setActiveSession(null))
+      .finally(() => setSessionLoading(false));
+  }, [authState]);
 
   /* ---- GPS Flow ---- */
   const startGps = useCallback(() => {
@@ -259,31 +322,81 @@ export default function HomePage() {
   }, []);
 
   const confirmCheckin = useCallback(async () => {
+    if (!gpsCoords || !activeSession) return;
     setCheckinState("submitting");
-    // TODO: call POST /api/attendance/checkin
-    await new Promise((r) => setTimeout(r, 1800));
-    // Simulate distance result (mock: 23m)
-    setDistanceResult(23);
-    setCheckedInAt(
-      new Date().toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-    );
-    setCheckinState("success");
-    toast.success("Kehadiran berhasil dicatat!");
-  }, [toast]);
 
-  const handleLogout = useCallback(() => {
-    // TODO: signOut from NextAuth
-    toast.warning("Fitur logout akan aktif setelah auth dikonfigurasi.");
-  }, [toast]);
+    try {
+      const res = await fetch("/api/attendance/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          session_id: activeSession.id,
+          lat: gpsCoords.lat,
+          lng: gpsCoords.lng,
+        }),
+      });
+      const json = await res.json();
 
-  const handleGoogleLogin = useCallback(() => {
-    // TODO: signIn("google") from NextAuth
-    toast.warning("Google OAuth belum dikonfigurasi. Isi .env.local terlebih dahulu.");
-  }, [toast]);
+      if (!json.success) {
+        const code: string = json.error ?? "";
+        if (code === "SESSION_INACTIVE") { setCheckinState("error-not-open"); return; }
+        if (code === "SESSION_EXPIRED")  { setCheckinState("error-expired"); return; }
+        if (code === "OUT_OF_RANGE")     {
+          setDistanceResult(json.details?.distance_meter ?? null);
+          setCheckinState("error-out-of-range");
+          return;
+        }
+        if (code === "ALREADY_CHECKED_IN") {
+          setCheckedInAt(json.details?.checked_in_at
+            ? new Date(json.details.checked_in_at).toLocaleTimeString("id-ID", {
+                hour: "2-digit", minute: "2-digit", second: "2-digit",
+              })
+            : null
+          );
+          setCheckinState("error-already-checked-in");
+          return;
+        }
+        if (code === "RATE_LIMITED") {
+          toast.error("Terlalu banyak percobaan. Tunggu sebentar dan coba lagi.");
+          setCheckinState("idle");
+          return;
+        }
+        toast.error(json.message ?? "Gagal absen. Coba lagi.");
+        setCheckinState("idle");
+        return;
+      }
+
+      // SUCCESS
+      const att = json.data;
+      setDistanceResult(att.distance_meter ?? null);
+      setCheckedInAt(
+        new Date().toLocaleTimeString("id-ID", {
+          hour: "2-digit", minute: "2-digit", second: "2-digit",
+        })
+      );
+      setCheckinState("success");
+      toast.success("Kehadiran berhasil dicatat!");
+    } catch {
+      toast.error("Gagal terhubung ke server. Periksa koneksi kamu.");
+      setCheckinState("idle");
+    }
+  }, [gpsCoords, activeSession, toast]);
+
+  const handleLogout = useCallback(async () => {
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/");
+  }, [router]);
+
+  const handleGoogleLogin = useCallback(async () => {
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+      },
+    });
+  }, []);
 
   const resetFlow = useCallback(() => {
     setCheckinState("idle");
@@ -291,6 +404,21 @@ export default function HomePage() {
     setDistanceResult(null);
     setCheckedInAt(null);
   }, []);
+
+  /* ============================================================
+     RENDER — Loading
+     ============================================================ */
+  if (authState === "loading") {
+    return (
+      <main
+        className="relative min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg-base)" }}
+      >
+        <BlobBackground />
+        <LoadingSpinner size="lg" />
+      </main>
+    );
+  }
 
   /* ============================================================
      RENDER — Not Logged In
@@ -348,12 +476,17 @@ export default function HomePage() {
         </div>
 
         {/* User Bar */}
-        <UserBar user={MOCK_USER} onLogout={handleLogout} />
+        <UserBar user={userInfo} onLogout={handleLogout} />
 
         {/* ---- Session Card + Check-in States ---- */}
-        {MOCK_SESSION.isActive ? (
+        {sessionLoading ? (
+          <GlassCard className="p-6 flex flex-col items-center gap-3">
+            <LoadingSpinner size="md" />
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Memeriksa sesi aktif...</p>
+          </GlassCard>
+        ) : activeSession ? (
           <div className="animate-fade-slide-up">
-            <SessionCard session={MOCK_SESSION}>
+            <SessionCard session={activeSession}>
               {/* ---- IDLE ---- */}
               {checkinState === "idle" && (
                 <div className="pt-1">
@@ -402,7 +535,7 @@ export default function HomePage() {
                     className="rounded-xl p-3 space-y-1"
                     style={{
                       background: "rgba(5,46,22,0.4)",
-                      border: "1px solid rgba(34,197,94,0.2)",
+                      border: "1px solid rgba(16,185,129,0.2)",
                     }}
                   >
                     <p className="text-xs font-medium" style={{ color: "var(--green-brand)" }}>
@@ -452,18 +585,18 @@ export default function HomePage() {
                       <div
                         className="absolute inset-0 rounded-full"
                         style={{
-                          background: "rgba(34,197,94,0.2)",
+                          background: "rgba(16,185,129,0.2)",
                           animation: "sonar 1.5s ease-out forwards",
                         }}
                       />
                       <div
                         className="relative flex items-center justify-center w-14 h-14 rounded-full"
-                        style={{ background: "rgba(34,197,94,0.15)", border: "2px solid #22c55e" }}
+                        style={{ background: "rgba(16,185,129,0.15)", border: "2px solid #10B981" }}
                       >
-                        <CheckCircle size={28} style={{ color: "#4ade80" }} />
+                        <CheckCircle size={28} style={{ color: "#34D399" }} />
                       </div>
                     </div>
-                    <p className="text-base font-bold text-center" style={{ color: "#4ade80" }}>
+                    <p className="text-base font-bold text-center" style={{ color: "#34D399" }}>
                       Kehadiran Dicatat!
                     </p>
                     <p className="text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
@@ -502,7 +635,7 @@ export default function HomePage() {
                   message={`Posisi kamu terlalu jauh dari titik absen.`}
                   onRetry={resetFlow}
                 >
-                  <DistanceBar actual={143} max={MOCK_SESSION.radius} className="mt-2" />
+                  <DistanceBar actual={distanceResult ?? 143} max={activeSession?.radius ?? 100} className="mt-2" />
                 </ErrorCard>
               )}
               {checkinState === "error-already-checked-in" && (
@@ -563,7 +696,7 @@ export default function HomePage() {
           <button className="flex items-center gap-1 hover:text-green-400 transition-colors">
             <Info size={12} /> Bantuan
           </button>
-          {MOCK_USER.isAdmin && (
+          {userInfo.isAdmin && (
             <a
               href="/dashboard"
               className="flex items-center gap-1 hover:text-green-400 transition-colors"

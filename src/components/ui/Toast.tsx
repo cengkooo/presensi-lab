@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { CheckCircle, XCircle, AlertTriangle, X } from "lucide-react";
@@ -22,8 +22,8 @@ const icons = {
 
 const styles: Record<ToastType, { border: string; icon: string; bg: string }> = {
   success: {
-    border: "rgba(34,197,94,0.3)",
-    icon: "#4ade80",
+    border: "rgba(16,185,129,0.3)",
+    icon: "#34D399",
     bg: "rgba(5,46,22,0.9)",
   },
   error: {

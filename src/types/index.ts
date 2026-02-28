@@ -39,6 +39,7 @@ export interface Enrollment {
   user_id: string;            // FK → User.id
   enrolled_at: string;
   is_eligible: boolean | null; // dihitung otomatis dari % kehadiran
+  peran: "mahasiswa" | "asisten" | "dosen"; // peran di kelas ini (bukan global)
 }
 
 /** Record kehadiran per mahasiswa per sesi */

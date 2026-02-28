@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -15,6 +15,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 
 const navMain = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -27,10 +28,19 @@ const navMgmt = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-const ADMIN = { name: "Alex Rivera", role: "Head Coordinator", initial: "AR" };
-
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
+  const router   = useRouter();
+  const { user, profile } = useSupabaseSession();
+
+  const displayName    = profile?.full_name ?? user?.email?.split("@")[0] ?? "User";
+  const displayRole    = profile?.role === "dosen" ? "Dosen / Koordinator" : profile?.role === "mahasiswa" ? "Mahasiswa" : "Admin";
+  const displayInitial = displayName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  const handleSignOut = useCallback(async () => {
+    await fetch("/api/auth/signout", { method: "POST" });
+    router.push("/");
+  }, [router]);
 
   const NavItem = ({
     href,
@@ -53,18 +63,18 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           active
             ? {
                 background:
-                  "linear-gradient(135deg, rgba(22,163,74,0.25), rgba(34,197,94,0.12))",
-                border: "1px solid rgba(34,197,94,0.3)",
-                color: "#4ade80",
+                  "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(16,185,129,0.09))",
+                border: "1px solid rgba(16,185,129,0.25)",
+                color: "#34D399",
               }
             : {
-                color: "rgba(134,239,172,0.5)",
+                color: "rgba(110,231,183,0.5)",
                 border: "1px solid transparent",
               }
         }
         onMouseEnter={(e) => {
           if (!active) {
-            (e.currentTarget as HTMLElement).style.color = "#4ade80";
+            (e.currentTarget as HTMLElement).style.color = "#34D399";
             (e.currentTarget as HTMLElement).style.background =
               "rgba(255,255,255,0.04)";
           }
@@ -72,7 +82,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         onMouseLeave={(e) => {
           if (!active) {
             (e.currentTarget as HTMLElement).style.color =
-              "rgba(134,239,172,0.5)";
+              "rgba(110,231,183,0.5)";
             (e.currentTarget as HTMLElement).style.background = "transparent";
           }
         }}
@@ -87,21 +97,21 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     <div
       className="flex flex-col h-full"
       style={{
-        background: "rgba(3,12,6,0.96)",
+        background: "rgba(7,22,18,0.96)",
         backdropFilter: "blur(24px)",
-        borderRight: "1px solid rgba(34,197,94,0.12)",
+        borderRight: "1px solid rgba(16,185,129,0.12)",
       }}
     >
       {/* Logo */}
       <div
         className="flex items-center gap-3 px-5 py-5"
-        style={{ borderBottom: "1px solid rgba(34,197,94,0.1)" }}
+        style={{ borderBottom: "1px solid rgba(16,185,129,0.1)" }}
       >
         <div
           className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
           style={{
-            background: "linear-gradient(135deg, #15803d, #22c55e)",
-            boxShadow: "0 0 16px rgba(34,197,94,0.4)",
+            background: "linear-gradient(135deg, #059669, #10B981)",
+            boxShadow: "0 0 16px rgba(16,185,129,0.35)",
           }}
         >
           <FlaskConical size={17} color="#fff" />
@@ -110,7 +120,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <p
             className="font-bold text-sm leading-tight"
             style={{
-              background: "linear-gradient(135deg, #22c55e, #bbf7d0)",
+              background: "linear-gradient(135deg, #10B981, #A7F3D0)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -120,7 +130,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </p>
           <p
             className="text-xs tracking-widest font-semibold leading-tight mt-0.5"
-            style={{ color: "rgba(134,239,172,0.4)", fontSize: "9px" }}
+            style={{ color: "rgba(110,231,183,0.4)", fontSize: "9px" }}
           >
             ADMIN CONTROL
           </p>
@@ -134,11 +144,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         ))}
         <div
           className="pt-5 mt-4"
-          style={{ borderTop: "1px solid rgba(34,197,94,0.08)" }}
+          style={{ borderTop: "1px solid rgba(16,185,129,0.08)" }}
         >
           <p
             className="px-3 pb-2 text-xs font-bold tracking-widest uppercase"
-            style={{ color: "rgba(134,239,172,0.3)", fontSize: "9px" }}
+            style={{ color: "rgba(110,231,183,0.3)", fontSize: "9px" }}
           >
             Management
           </p>
@@ -151,31 +161,32 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* User */}
       <div
         className="px-3 py-4"
-        style={{ borderTop: "1px solid rgba(34,197,94,0.08)" }}
+        style={{ borderTop: "1px solid rgba(16,185,129,0.08)" }}
       >
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl"
-          style={{ background: "rgba(34,197,94,0.05)" }}>
+          style={{ background: "rgba(16,185,129,0.05)" }}>
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
             style={{
-              background: "linear-gradient(135deg, #1a3a1a, #2a5a2a)",
-              border: "1px solid rgba(34,197,94,0.25)",
-              color: "#4ade80",
+              background: "linear-gradient(135deg, #0f2d27, #164035)",
+              border: "1px solid rgba(16,185,129,0.2)",
+              color: "#34D399",
             }}
           >
-            {ADMIN.initial}
+            {displayInitial}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold truncate" style={{ color: "#e2f5e8" }}>
-              {ADMIN.name}
+              {displayName}
             </p>
-            <p className="text-xs truncate" style={{ color: "rgba(134,239,172,0.4)" }}>
-              {ADMIN.role}
+            <p className="text-xs truncate" style={{ color: "rgba(110,231,183,0.4)" }}>
+              {displayRole}
             </p>
           </div>
           <button
+            onClick={handleSignOut}
             className="p-1.5 rounded-lg flex-shrink-0 transition-opacity hover:opacity-70"
-            style={{ color: "rgba(134,239,172,0.4)" }}
+            style={{ color: "rgba(110,231,183,0.4)" }}
             title="Keluar"
           >
             <LogOut size={13} />
@@ -205,9 +216,9 @@ export function Sidebar() {
         className="md:hidden fixed top-3 left-3 z-50 w-9 h-9 flex items-center justify-center rounded-xl"
         onClick={() => setMobileOpen(true)}
         style={{
-          background: "rgba(5,20,10,0.9)",
-          border: "1px solid rgba(34,197,94,0.2)",
-          color: "#4ade80",
+          background: "rgba(7,22,18,0.9)",
+          border: "1px solid rgba(16,185,129,0.2)",
+          color: "#34D399",
         }}
       >
         <Menu size={18} />
@@ -234,8 +245,8 @@ export function Sidebar() {
           className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-lg"
           onClick={() => setMobileOpen(false)}
           style={{
-            background: "rgba(34,197,94,0.1)",
-            color: "#4ade80",
+            background: "rgba(16,185,129,0.1)",
+            color: "#34D399",
           }}
         >
           <X size={14} />
@@ -247,8 +258,8 @@ export function Sidebar() {
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-30"
         style={{
-          background: "rgba(3,12,6,0.96)",
-          borderTop: "1px solid rgba(34,197,94,0.12)",
+          background: "rgba(7,22,18,0.96)",
+          borderTop: "1px solid rgba(16,185,129,0.12)",
           backdropFilter: "blur(20px)",
         }}
       >
@@ -263,7 +274,7 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className="flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl"
-                style={{ color: active ? "#4ade80" : "rgba(134,239,172,0.4)" }}
+                style={{ color: active ? "#34D399" : "rgba(110,231,183,0.4)" }}
               >
                 <Icon size={19} />
                 <span className="text-xs">{item.label.split(" ")[0]}</span>

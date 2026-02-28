@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardClientWrapper } from "@/components/layout/DashboardClientWrapper";
 
@@ -14,7 +14,7 @@ export default function DashboardLayout({
 }) {
   return (
     <DashboardClientWrapper>
-    <div style={{ background: "#020d06", minHeight: "100vh", display: "flex" }}>
+    <div style={{ background: "#0B1F1A", minHeight: "100vh", display: "flex" }}>
       <Sidebar />
       {/* Spacer untuk desktop sidebar — inline style, tidak bergantung Tailwind arbitrary value */}
       <div

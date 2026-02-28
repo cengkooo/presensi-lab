@@ -88,22 +88,22 @@ export const MOCK_ENROLLMENTS: Enrollment[] = [
   // Class c1 — 10 mahasiswa
   ...(["u1","u2","u3","u4","u5","u6","u7","u8","u9","u10"] as const).map((uid, i) => ({
     id: `e_c1_${uid}`, class_id: "c1", user_id: uid,
-    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null,
+    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null, peran: "mahasiswa" as const,
   })),
   // Class c2 — 8 mahasiswa
   ...(["u1","u2","u3","u4","u5","u6","u7","u8"] as const).map((uid) => ({
     id: `e_c2_${uid}`, class_id: "c2", user_id: uid,
-    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null,
+    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null, peran: "mahasiswa" as const,
   })),
   // Class c3 — 7 mahasiswa
   ...(["u1","u3","u4","u5","u7","u8","u9"] as const).map((uid) => ({
     id: `e_c3_${uid}`, class_id: "c3", user_id: uid,
-    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null,
+    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null, peran: "mahasiswa" as const,
   })),
   // Class c4 — 9 mahasiswa
   ...(["u1","u2","u3","u4","u5","u6","u7","u8","u9"] as const).map((uid) => ({
     id: `e_c4_${uid}`, class_id: "c4", user_id: uid,
-    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null,
+    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null, peran: "mahasiswa" as const,
   })),
 ];
 

@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, Users, BarChart3, Clock, Plus } from "lucide-react";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { ActivateAttendance } from "@/components/dashboard/ActivateAttendance";
 import { LiveAttendanceList } from "@/components/dashboard/LiveAttendanceList";
 import { AttendanceTable } from "@/components/dashboard/AttendanceTable";
@@ -12,9 +13,52 @@ import { useToast } from "@/hooks/useToast";
 
 type ActivateState = "idle" | "active" | "expired";
 
+type DashStats = {
+  totalSesi: number;
+  mahasiswaCount: number;
+  avgPct: number;
+  hariIni: number;
+};
+
+function useDashStats() {
+  const [stats, setStats]   = useState<DashStats>({ totalSesi: 0, mahasiswaCount: 0, avgPct: 0, hariIni: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    const today = new Date().toISOString().split("T")[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any;
+
+    Promise.all([
+      // Total sessions
+      sb.from("sessions").select("id", { count: "exact", head: true }),
+      // Mahasiswa count
+      sb.from("profiles").select("id", { count: "exact", head: true }).eq("role", "mahasiswa"),
+      // Attendance: hadir or telat
+      sb.from("attendance").select("status") as Promise<{ data: { status: string }[] | null }>,
+      // Sessions today
+      sb.from("sessions").select("id", { count: "exact", head: true }).eq("session_date", today),
+    ]).then(([sesi, mhs, atts, hariIni]: [{ count: number | null }, { count: number | null }, { data: { status: string }[] | null }, { count: number | null }]) => {
+      const totalAtt = atts.data?.length ?? 0;
+      const hadirAtt = atts.data?.filter((a) => a.status === "hadir" || a.status === "telat").length ?? 0;
+      setStats({
+        totalSesi:     sesi.count ?? 0,
+        mahasiswaCount:mhs.count ?? 0,
+        avgPct:        totalAtt > 0 ? Math.round((hadirAtt / totalAtt) * 100) : 0,
+        hariIni:       hariIni.count ?? 0,
+      });
+    }).catch(() => {/* silent */}).finally(() => setLoading(false));
+  }, []);
+
+  return { stats, loading };
+}
+
+
 export default function DashboardPage() {
   const [activateState, setActivateState] = useState<ActivateState>("idle");
   const { toasts, toast, dismissToast } = useToast();
+  const { stats } = useDashStats();
 
   return (
     <div
@@ -47,7 +91,7 @@ export default function DashboardPage() {
           >
             Dashboard Overview
           </h1>
-          <p style={{ color: "rgba(134,239,172,0.5)", fontSize: "14px", marginTop: "6px" }}>
+          <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", marginTop: "6px" }}>
             Monitoring live practicum attendance and session performance
           </p>
         </div>
@@ -58,14 +102,14 @@ export default function DashboardPage() {
             alignItems: "center",
             gap: "8px",
             padding: "10px 18px",
-            background: "linear-gradient(135deg, #15803d, #22c55e)",
+            background: "linear-gradient(135deg, #059669, #10B981)",
             color: "#fff",
             fontSize: "14px",
             fontWeight: 600,
             borderRadius: "12px",
             border: "none",
             cursor: "pointer",
-            boxShadow: "0 4px 18px rgba(34,197,94,0.3)",
+            boxShadow: "0 4px 18px rgba(16,185,129,0.3)",
             whiteSpace: "nowrap",
             flexShrink: 0,
           }}
@@ -84,10 +128,10 @@ export default function DashboardPage() {
         }}
         className="stat-grid"
       >
-        <StatCard icon={<Calendar size={18} style={{ color: "#4ade80" }} />} label="Total Sesi" value="124" trend={5} />
-        <StatCard icon={<Users size={18} style={{ color: "#4ade80" }} />} label="Mahasiswa" value="850" trend={2} />
-        <StatCard icon={<BarChart3 size={18} style={{ color: "#f87171" }} />} label="Rata-rata %" value="92%" trend={-1} />
-        <StatCard icon={<Clock size={18} style={{ color: "#4ade80" }} />} label="Hari Ini" value="12" trend={8} />
+        <StatCard icon={<Calendar size={18} style={{ color: "#34D399" }} />} label="Total Sesi" value={String(stats.totalSesi)} trend={5} />
+        <StatCard icon={<Users size={18} style={{ color: "#34D399" }} />} label="Mahasiswa" value={String(stats.mahasiswaCount)} trend={2} />
+        <StatCard icon={<BarChart3 size={18} style={{ color: stats.avgPct >= 70 ? "#34D399" : "#f87171" }} />} label="Rata-rata %" value={`${stats.avgPct}%`} trend={-1} />
+        <StatCard icon={<Clock size={18} style={{ color: "#34D399" }} />} label="Hari Ini" value={String(stats.hariIni)} trend={8} />
       </div>
 
       {/* ── ACTIVATE + LIVE FEED ── */}
@@ -121,7 +165,7 @@ export default function DashboardPage() {
           <h2 style={{ color: "#f0fdf4", fontSize: "15px", fontWeight: 700 }}>
             Riwayat Absensi
           </h2>
-          <p style={{ color: "rgba(134,239,172,0.4)", fontSize: "12px", marginTop: "4px" }}>
+          <p style={{ color: "rgba(110,231,183,0.4)", fontSize: "12px", marginTop: "4px" }}>
             Semua data kehadiran mahasiswa
           </p>
         </div>
