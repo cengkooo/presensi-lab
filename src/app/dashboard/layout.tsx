@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { DashboardClientWrapper } from "@/components/layout/DashboardClientWrapper";
 
 export const metadata: Metadata = {
   title: "Dashboard — PresensLab Admin",
@@ -12,6 +13,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
+    <DashboardClientWrapper>
     <div style={{ background: "#020d06", minHeight: "100vh", display: "flex" }}>
       <Sidebar />
       {/* Spacer untuk desktop sidebar — inline style, tidak bergantung Tailwind arbitrary value */}
@@ -42,5 +44,6 @@ export default function DashboardLayout({
         }
       `}</style>
     </div>
+    </DashboardClientWrapper>
   );
 }

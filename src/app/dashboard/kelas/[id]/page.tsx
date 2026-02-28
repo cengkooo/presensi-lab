@@ -9,9 +9,10 @@ import {
   Edit2, Save, X, MapPin,
 } from "lucide-react";
 import {
-  MOCK_CLASSES, MOCK_ATTENDANCES, MOCK_USERS,
+  MOCK_ATTENDANCES, MOCK_USERS,
   getSessionsByClass, computeStudentSummaries,
 } from "@/lib/mockData";
+import { useClasses } from "@/context/ClassesContext";
 import type { Attendance, AttendanceStatus, Session } from "@/types";
 
 type Tab = "sesi" | "mahasiswa" | "rekap";
@@ -54,7 +55,6 @@ function AttendanceOverrideCell({
   }, [open]);
 
   const effectiveStatus: AttendanceStatus | null = overrideStatus ?? (att?.status ?? null);
-  const isOverridden = overrideStatus !== null;
   const meta = effectiveStatus ? STATUS_META[effectiveStatus] : null;
 
   return (
@@ -67,7 +67,7 @@ function AttendanceOverrideCell({
           width: 28, height: 28, borderRadius: 7,
           display: "flex", alignItems: "center", justifyContent: "center",
           background: meta ? meta.bg : "transparent",
-          border: isOverridden ? "1px solid rgba(234,179,8,0.5)" : `1px solid ${meta ? meta.color + "44" : "transparent"}`,
+          border: `1px solid ${meta ? meta.color + "44" : "transparent"}`,
           color: meta?.color ?? "rgba(134,239,172,0.2)",
           cursor: "pointer", position: "relative", transition: "all 0.15s",
         }}
@@ -79,9 +79,6 @@ function AttendanceOverrideCell({
           : sessionActive
             ? <span style={{ fontSize: 11, color: "rgba(134,239,172,0.2)" }}>·</span>
             : <XCircle size={13} style={{ color: "#f87171", opacity: 0.3 }} />}
-        {isOverridden && (
-          <span style={{ position: "absolute", top: 1, right: 1, width: 5, height: 5, borderRadius: "50%", background: "#facc15" }} />
-        )}
       </button>
 
       {/* Mini icon-only dropdown */}
@@ -187,8 +184,9 @@ export default function KelasDetailPage() {
   const params = useParams();
   const router = useRouter();
   const classId = params.id as string;
+  const { classes: allClasses } = useClasses();
 
-  const kelas = MOCK_CLASSES.find((c) => c.id === classId);
+  const kelas = allClasses.find((c) => c.id === classId);
   const initialSessions = getSessionsByClass(classId);
   const completedSessions = initialSessions.filter((s) => !s.is_active);
 
@@ -244,8 +242,23 @@ export default function KelasDetailPage() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#f0fdf4" }}>Kelas tidak ditemukan.</div>
   );
 
-  const avgPct = summaries.length > 0 ? Math.round(summaries.reduce((a, s) => a + s.attendance_pct, 0) / summaries.length) : 0;
-  const eligibleCount = summaries.filter((s) => s.is_eligible).length;
+  // Live per-student stats: recompute pct using overrides + total_sessions_planned as denominator
+  const liveStudentStats = summaries.map((s) => {
+    const effectiveHadir = sessions.filter((sess) => {
+      const override = manualOverrides[`${s.user.id}_${sess.id}` as OverrideKey] ?? null;
+      const status = override ?? s.attendanceMap[sess.id]?.status ?? null;
+      return status === "hadir" || status === "telat";
+    }).length;
+    const pct = kelas.total_sessions_planned > 0
+      ? Math.round((effectiveHadir / kelas.total_sessions_planned) * 100)
+      : 0;
+    return { userId: s.user.id, pct, eligible: pct >= kelas.min_attendance_pct, effectiveHadir };
+  });
+
+  const avgPct = liveStudentStats.length > 0
+    ? Math.round(liveStudentStats.reduce((a, s) => a + s.pct, 0) / liveStudentStats.length)
+    : 0;
+  const eligibleCount = liveStudentStats.filter((s) => s.eligible).length;
   const activeSession = sessions.find((s) => s.is_active);
 
   const handleSaveSession = (form: { title: string; date: string; location: string; radius_meters: number; duration_minutes: number }) => {
@@ -430,33 +443,35 @@ export default function KelasDetailPage() {
                       </div>
                     </div>
                   </td>
+                  {(() => { const ls = liveStudentStats.find((x) => x.userId === s.user.id)!; return (<>
                   <td style={{ padding: "12px 18px" }}>
                     <span style={{ fontSize: "14px", fontWeight: 700, color: "#4ade80", fontVariantNumeric: "tabular-nums" }}>
-                      {s.total_hadir + s.total_telat}
+                      {ls.effectiveHadir}
                     </span>
-                    <span style={{ fontSize: "11px", color: "rgba(134,239,172,0.35)" }}>/{completedSessions.length}</span>
+                    <span style={{ fontSize: "11px", color: "rgba(134,239,172,0.35)" }}>/{kelas.total_sessions_planned}</span>
                   </td>
                   <td style={{ padding: "12px 18px", minWidth: "150px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden", position: "relative" }}>
-                        <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${s.attendance_pct}%`, borderRadius: 3, transition: "width 0.5s",
-                          background: s.attendance_pct >= kelas.min_attendance_pct ? "#4ade80" : s.attendance_pct >= 60 ? "#facc15" : "#f87171" }} />
+                        <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${ls.pct}%`, borderRadius: 3, transition: "width 0.5s",
+                          background: ls.pct >= kelas.min_attendance_pct ? "#4ade80" : ls.pct >= 60 ? "#facc15" : "#f87171" }} />
                         <div style={{ position: "absolute", top: 0, height: "100%", width: 1.5, left: `${kelas.min_attendance_pct}%`, background: "rgba(255,255,255,0.25)" }} />
                       </div>
                       <span style={{ fontSize: "12px", fontWeight: 700, minWidth: "36px", fontVariantNumeric: "tabular-nums",
-                        color: s.attendance_pct >= kelas.min_attendance_pct ? "#4ade80" : s.attendance_pct >= 60 ? "#facc15" : "#f87171" }}>
-                        {s.attendance_pct}%
+                        color: ls.pct >= kelas.min_attendance_pct ? "#4ade80" : ls.pct >= 60 ? "#facc15" : "#f87171" }}>
+                        {ls.pct}%
                       </span>
                     </div>
                   </td>
                   <td style={{ padding: "12px 18px" }}>
                     <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "20px",
-                      background: s.is_eligible ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.1)",
-                      color: s.is_eligible ? "#4ade80" : "#f87171",
-                      border: s.is_eligible ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(239,68,68,0.2)" }}>
-                      {s.is_eligible ? "Lulus" : "Perlu Perhatian"}
+                      background: ls.eligible ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.1)",
+                      color: ls.eligible ? "#4ade80" : "#f87171",
+                      border: ls.eligible ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(239,68,68,0.2)" }}>
+                      {ls.eligible ? "Lulus" : "Perlu Perhatian"}
                     </span>
                   </td>
+                  </>); })()}
                 </tr>
               ))}
             </tbody>
@@ -531,24 +546,26 @@ export default function KelasDetailPage() {
                           </td>
                         );
                       })}
+                      {(() => { const ls = liveStudentStats.find((x) => x.userId === s.user.id)!; return (<>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         <div style={{ marginBottom: "3px", fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                          color: s.attendance_pct >= kelas.min_attendance_pct ? "#4ade80" : s.attendance_pct >= 60 ? "#facc15" : "#f87171" }}>
-                          {s.attendance_pct}%
+                          color: ls.pct >= kelas.min_attendance_pct ? "#4ade80" : ls.pct >= 60 ? "#facc15" : "#f87171" }}>
+                          {ls.pct}%
                         </div>
                         <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2 }}>
-                          <div style={{ height: "100%", width: `${s.attendance_pct}%`, borderRadius: 2, transition: "width 0.5s",
-                            background: s.attendance_pct >= kelas.min_attendance_pct ? "#4ade80" : "#f87171" }} />
+                          <div style={{ height: "100%", width: `${ls.pct}%`, borderRadius: 2, transition: "width 0.5s",
+                            background: ls.pct >= kelas.min_attendance_pct ? "#4ade80" : "#f87171" }} />
                         </div>
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         <span style={{ fontSize: "11px", fontWeight: 700, padding: "3px 8px", borderRadius: "20px",
-                          background: s.is_eligible ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.1)",
-                          color: s.is_eligible ? "#4ade80" : "#f87171",
-                          border: s.is_eligible ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(239,68,68,0.2)" }}>
-                          {s.is_eligible ? "Lulus" : "Tidak"}
+                          background: ls.eligible ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.1)",
+                          color: ls.eligible ? "#4ade80" : "#f87171",
+                          border: ls.eligible ? "1px solid rgba(34,197,94,0.2)" : "1px solid rgba(239,68,68,0.2)" }}>
+                          {ls.eligible ? "Lulus" : "Tidak"}
                         </span>
                       </td>
+                      </>); })()}
                     </tr>
                   ))}
                 </tbody>

@@ -47,6 +47,13 @@ export const MOCK_CLASSES: PraktikumClass[] = [
     location: "Lab Komputer 05",
     min_attendance_pct: 75, total_sessions_planned: 10, created_at: "2026-01-20T08:00:00Z",
   },
+  {
+    id: "c4", code: "PW-1",
+    name: "Praktikum Pengembangan Website",
+    semester: "Genap 2025/2026", lecturer: "Dr. Gua",
+    location: "LABTEK 1",
+    min_attendance_pct: 75, total_sessions_planned: 14, created_at: "2026-01-20T08:00:00Z",
+  },
 ];
 
 // ── SESSIONS (FK: class_id) ─────────────────────────────
@@ -67,6 +74,13 @@ export const MOCK_SESSIONS: Session[] = [
   { id: "s11", class_id: "c3", title: "Sesi 1",  date: "2026-01-29", location: "Lab 05", radius_meters: 100, duration_minutes: 90, is_active: false, expires_at: null, location_lat: -6.22, location_lng: 106.82, created_at: "2026-01-29T07:00:00Z" },
   { id: "s12", class_id: "c3", title: "Sesi 2",  date: "2026-02-05", location: "Lab 05", radius_meters: 100, duration_minutes: 90, is_active: false, expires_at: null, location_lat: -6.22, location_lng: 106.82, created_at: "2026-02-05T07:00:00Z" },
   { id: "s13", class_id: "c3", title: "Sesi 3",  date: "2026-02-12", location: "Lab 05", radius_meters: 100, duration_minutes: 90, is_active: false, expires_at: null, location_lat: -6.22, location_lng: 106.82, created_at: "2026-02-12T07:00:00Z" },
+  // --- Class c4: Pengembangan Website ---
+  { id: "s14", class_id: "c4", title: "Sesi 1",  date: "2026-01-28", location: "LABTEK 1", radius_meters: 100, duration_minutes: 100, is_active: false, expires_at: null, location_lat: -6.195, location_lng: 106.823, created_at: "2026-01-28T07:30:00Z" },
+  { id: "s15", class_id: "c4", title: "Sesi 2",  date: "2026-02-04", location: "LABTEK 1", radius_meters: 100, duration_minutes: 100, is_active: false, expires_at: null, location_lat: -6.195, location_lng: 106.823, created_at: "2026-02-04T07:30:00Z" },
+  { id: "s16", class_id: "c4", title: "Sesi 3",  date: "2026-02-11", location: "LABTEK 1", radius_meters: 100, duration_minutes: 100, is_active: false, expires_at: null, location_lat: -6.195, location_lng: 106.823, created_at: "2026-02-11T07:30:00Z" },
+  { id: "s17", class_id: "c4", title: "Sesi 4",  date: "2026-02-18", location: "LABTEK 1", radius_meters: 100, duration_minutes: 100, is_active: false, expires_at: null, location_lat: -6.195, location_lng: 106.823, created_at: "2026-02-18T07:30:00Z" },
+  { id: "s18", class_id: "c4", title: "Sesi 5",  date: "2026-02-25", location: "LABTEK 1", radius_meters: 100, duration_minutes: 100, is_active: false, expires_at: null, location_lat: -6.195, location_lng: 106.823, created_at: "2026-02-25T07:30:00Z" },
+  { id: "s19", class_id: "c4", title: "Sesi 6",  date: "2026-02-28", location: "LABTEK 1", radius_meters: 100, duration_minutes: 100, is_active: false, expires_at: null, location_lat: -6.195, location_lng: 106.823, created_at: "2026-02-28T07:30:00Z" },
 ];
 
 // ── ENROLLMENTS (FK: class_id + user_id) ───────────────
@@ -84,6 +98,11 @@ export const MOCK_ENROLLMENTS: Enrollment[] = [
   // Class c3 — 7 mahasiswa
   ...(["u1","u3","u4","u5","u7","u8","u9"] as const).map((uid) => ({
     id: `e_c3_${uid}`, class_id: "c3", user_id: uid,
+    enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null,
+  })),
+  // Class c4 — 9 mahasiswa
+  ...(["u1","u2","u3","u4","u5","u6","u7","u8","u9"] as const).map((uid) => ({
+    id: `e_c4_${uid}`, class_id: "c4", user_id: uid,
     enrolled_at: "2026-01-20T08:00:00Z", is_eligible: null,
   })),
 ];
@@ -169,6 +188,68 @@ export const MOCK_ATTENDANCES: Attendance[] = [
   mkAtt("f2",  "s6","u2","hadir",   35, "2026-02-28T08:15:00Z"),
   // u3, u4, u5, u6... belum check-in (sesi masih aktif)
 
+  // ── Class c4: Pengembangan Website (s14–s19) ──
+  // Sesi 1 (s14)
+  mkAtt("pw1",  "s14","u1","hadir",   15, "2026-01-28T08:10:00Z"),
+  mkAtt("pw2",  "s14","u2","hadir",   22, "2026-01-28T08:13:00Z"),
+  mkAtt("pw3",  "s14","u3","telat",   55, "2026-01-28T08:50:00Z"),
+  mkAtt("pw4",  "s14","u4","hadir",   8,  "2026-01-28T08:04:00Z"),
+  mkAtt("pw5",  "s14","u5","hadir",   30, "2026-01-28T08:17:00Z"),
+  mkAtt("pw6",  "s14","u6","hadir",   20, "2026-01-28T08:11:00Z"),
+  mkAtt("pw7",  "s14","u7","hadir",   14, "2026-01-28T08:08:00Z"),
+  mkAtt("pw8",  "s14","u8","hadir",   35, "2026-01-28T08:20:00Z"),
+  mkAtt("pw9",  "s14","u9","absen",   null, null),
+  // Sesi 2 (s15)
+  mkAtt("pw10", "s15","u1","hadir",   12, "2026-02-04T08:09:00Z"),
+  mkAtt("pw11", "s15","u2","hadir",   28, "2026-02-04T08:15:00Z"),
+  mkAtt("pw12", "s15","u3","hadir",   18, "2026-02-04T08:10:00Z"),
+  mkAtt("pw13", "s15","u4","hadir",   7,  "2026-02-04T08:03:00Z"),
+  mkAtt("pw14", "s15","u5","absen",   null, null),
+  mkAtt("pw15", "s15","u6","hadir",   25, "2026-02-04T08:14:00Z"),
+  mkAtt("pw16", "s15","u7","hadir",   16, "2026-02-04T08:09:00Z"),
+  mkAtt("pw17", "s15","u8","hadir",   32, "2026-02-04T08:19:00Z"),
+  mkAtt("pw18", "s15","u9","hadir",   40, "2026-02-04T08:25:00Z"),
+  // Sesi 3 (s16)
+  mkAtt("pw19", "s16","u1","hadir",   10, "2026-02-11T08:06:00Z"),
+  mkAtt("pw20", "s16","u2","hadir",   24, "2026-02-11T08:13:00Z"),
+  mkAtt("pw21", "s16","u3","hadir",   20, "2026-02-11T08:11:00Z"),
+  mkAtt("pw22", "s16","u4","telat",   65, "2026-02-11T08:53:00Z"),
+  mkAtt("pw23", "s16","u5","hadir",   28, "2026-02-11T08:15:00Z"),
+  mkAtt("pw24", "s16","u6","hadir",   17, "2026-02-11T08:10:00Z"),
+  mkAtt("pw25", "s16","u7","absen",   null, null),
+  mkAtt("pw26", "s16","u8","hadir",   38, "2026-02-11T08:22:00Z"),
+  mkAtt("pw27", "s16","u9","absen",   null, null),
+  // Sesi 4 (s17)
+  mkAtt("pw28", "s17","u1","hadir",   14, "2026-02-18T08:08:00Z"),
+  mkAtt("pw29", "s17","u2","absen",   null, null),
+  mkAtt("pw30", "s17","u3","hadir",   19, "2026-02-18T08:11:00Z"),
+  mkAtt("pw31", "s17","u4","hadir",   9,  "2026-02-18T08:05:00Z"),
+  mkAtt("pw32", "s17","u5","hadir",   31, "2026-02-18T08:18:00Z"),
+  mkAtt("pw33", "s17","u6","telat",   58, "2026-02-18T08:51:00Z"),
+  mkAtt("pw34", "s17","u7","hadir",   22, "2026-02-18T08:13:00Z"),
+  mkAtt("pw35", "s17","u8","hadir",   29, "2026-02-18T08:17:00Z"),
+  mkAtt("pw36", "s17","u9","absen",   null, null),
+  // Sesi 5 (s18)
+  mkAtt("pw37", "s18","u1","hadir",   11, "2026-02-25T08:07:00Z"),
+  mkAtt("pw38", "s18","u2","hadir",   26, "2026-02-25T08:14:00Z"),
+  mkAtt("pw39", "s18","u3","hadir",   21, "2026-02-25T08:12:00Z"),
+  mkAtt("pw40", "s18","u4","hadir",   8,  "2026-02-25T08:04:00Z"),
+  mkAtt("pw41", "s18","u5","absen",   null, null),
+  mkAtt("pw42", "s18","u6","hadir",   18, "2026-02-25T08:10:00Z"),
+  mkAtt("pw43", "s18","u7","ditolak", 142, "2026-02-25T08:35:00Z"),
+  mkAtt("pw44", "s18","u8","hadir",   34, "2026-02-25T08:21:00Z"),
+  mkAtt("pw45", "s18","u9","hadir",   44, "2026-02-25T08:27:00Z"),
+  // Sesi 6 (s19)
+  mkAtt("pw46", "s19","u1","hadir",   13, "2026-02-28T08:08:00Z"),
+  mkAtt("pw47", "s19","u2","hadir",   27, "2026-02-28T08:15:00Z"),
+  mkAtt("pw48", "s19","u3","hadir",   17, "2026-02-28T08:10:00Z"),
+  mkAtt("pw49", "s19","u4","hadir",   6,  "2026-02-28T08:03:00Z"),
+  mkAtt("pw50", "s19","u5","hadir",   29, "2026-02-28T08:16:00Z"),
+  mkAtt("pw51", "s19","u6","hadir",   22, "2026-02-28T08:12:00Z"),
+  mkAtt("pw52", "s19","u7","hadir",   15, "2026-02-28T08:09:00Z"),
+  mkAtt("pw53", "s19","u8","absen",   null, null),
+  mkAtt("pw54", "s19","u9","absen",   null, null),
+
   // ── Class c2 sessions (s7–s10) ──
   mkAtt("g1","s7","u1","hadir",12,"2026-01-28T08:10:00Z"),
   mkAtt("g2","s7","u2","hadir",25,"2026-01-28T08:13:00Z"),
@@ -206,7 +287,8 @@ export function getEnrolledUsers(classId: string): User[] {
 export function computeStudentSummaries(classId: string): StudentAttendanceSummary[] {
   const sessions = getSessionsByClass(classId);
   const enrolled = MOCK_ENROLLMENTS.filter((e) => e.class_id === classId);
-  const kelas = MOCK_CLASSES.find((c) => c.id === classId)!;
+  const kelas = MOCK_CLASSES.find((c) => c.id === classId);
+  if (!kelas || enrolled.length === 0) return [];
 
   return enrolled.map((enrollment) => {
     const user = MOCK_USERS.find((u) => u.id === enrollment.user_id)!;
@@ -226,8 +308,10 @@ export function computeStudentSummaries(classId: string): StudentAttendanceSumma
     const total_absen   = values.filter((a) => a?.status === "absen" || a === null).length;
     const total_ditolak = values.filter((a) => a?.status === "ditolak").length;
     const effective_hadir = total_hadir + total_telat; // telat tetap dihitung hadir
-    const attendance_pct = completedSessions.length > 0
-      ? Math.round((effective_hadir / completedSessions.length) * 100)
+    // Pakai total_sessions_planned sebagai penyebut agar % dinamis sejak awal semester
+    const denominator = kelas.total_sessions_planned > 0 ? kelas.total_sessions_planned : completedSessions.length;
+    const attendance_pct = denominator > 0
+      ? Math.round((effective_hadir / denominator) * 100)
       : 0;
     const is_eligible = attendance_pct >= kelas.min_attendance_pct;
 
@@ -272,8 +356,10 @@ export function getStudentClassSummaries(userId: string): StudentClassSummary[] 
     );
     const total_hadir = atts.filter((a) => a.status === "hadir").length;
     const total_telat = atts.filter((a) => a.status === "telat").length;
-    const pct = completedSessions.length > 0
-      ? Math.round(((total_hadir + total_telat) / completedSessions.length) * 100)
+    // Pakai total_sessions_planned sebagai penyebut agar % dinamis
+    const denominator = kelas.total_sessions_planned > 0 ? kelas.total_sessions_planned : completedSessions.length;
+    const pct = denominator > 0
+      ? Math.round(((total_hadir + total_telat) / denominator) * 100)
       : 0;
     return {
       kelas, enrollment,

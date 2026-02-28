@@ -7,10 +7,11 @@ import {
   MapPin, Radio, Users, Play, Square, RefreshCw, Zap,
 } from "lucide-react";
 import {
-  MOCK_CLASSES, MOCK_ATTENDANCES,
+  MOCK_ATTENDANCES,
   getSessionsByClass, computeStudentSummaries,
 } from "@/lib/mockData";
 import { MOCK_USERS } from "@/lib/mockData";
+import { useClasses } from "@/context/ClassesContext";
 import type { Attendance } from "@/types";
 
 /* ── LIVE FEED ROW ── */
@@ -76,8 +77,9 @@ export default function SesiDetailPage() {
   const router = useRouter();
   const classId = params.id as string;
   const sesiId = params.sesiId as string;
+  const { classes: allClasses } = useClasses();
 
-  const kelas = MOCK_CLASSES.find((c) => c.id === classId);
+  const kelas = allClasses.find((c) => c.id === classId);
   const session = getSessionsByClass(classId).find((s) => s.id === sesiId);
   const summaries = computeStudentSummaries(classId);
 
