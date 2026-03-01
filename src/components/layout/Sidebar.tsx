@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
   Users,
@@ -30,7 +31,6 @@ const navMgmt = [
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
-  const router   = useRouter();
   const { user, profile } = useSupabaseSession();
 
   const displayName    = profile?.full_name ?? user?.email?.split("@")[0] ?? "User";
@@ -43,9 +43,14 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const visibleMgmt = navMgmt.filter((item) => !item.staffOnly || isStaff);
 
   const handleSignOut = useCallback(async () => {
+    // Hapus session client-side (localStorage/cookie Supabase)
+    const supabase = createSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    // Hapus session server-side (cookie HTTP-only)
     await fetch("/api/auth/signout", { method: "POST" });
-    router.push("/");
-  }, [router]);
+    // Hard redirect — bersihkan semua state React & cache, paksa login ulang
+    window.location.replace("/login");
+  }, []);
 
   const NavItem = ({
     href,
