@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -10,7 +10,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
-/* ── EXPORT OPTIONS ── */
+/* -- EXPORT OPTIONS -- */
 const REPORT_TYPES = [
   { id: "all", label: "Semua Data Absensi", desc: "Seluruh riwayat kehadiran semua sesi" },
   { id: "session", label: "Per Sesi Praktikum", desc: "Rekap kehadiran berdasarkan sesi tertentu" },
@@ -18,15 +18,15 @@ const REPORT_TYPES = [
   { id: "summary", label: "Rekap Bulanan", desc: "Ringkasan statistik kehadiran per bulan" },
 ];
 
-/* ── STAT MINI ── */
+/* -- STAT MINI -- */
 function MiniStat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
     <div className="glass rounded-2xl" style={{ padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
-        <span style={{ fontSize: "12px", color: "rgba(110,231,183,0.5)" }}>{label}</span>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(230,245,239,0.8)", border: "1px solid rgba(168,216,196,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+        <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>{label}</span>
       </div>
-      <p style={{ fontSize: "26px", fontWeight: 700, color: "#f0fdf4", fontVariantNumeric: "tabular-nums" }}>{value}</p>
+      <p style={{ fontSize: "26px", fontWeight: 700, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</p>
     </div>
   );
 }
@@ -139,7 +139,7 @@ export default function ExportPage() {
         `"${profileMap[r.user_id]?.full_name ?? "-"}"`,
         `"${profileMap[r.user_id]?.nim ?? "-"}"`,
         `"${r.sessions?.title ?? "-"}"`,
-        `"${r.sessions?.classes?.code ?? ""} — ${r.sessions?.classes?.name ?? ""}"`,
+        `"${r.sessions?.classes?.code ?? ""} � ${r.sessions?.classes?.name ?? ""}"`,
         `"${r.sessions?.session_date ?? "-"}"`,
         `"${r.checked_in_at ? new Date(r.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "--:--"}"`,
         `"${r.status}"`,
@@ -161,7 +161,7 @@ export default function ExportPage() {
     }
   };
 
-  // ── Loading / Access Guard ──
+  // -- Loading / Access Guard --
   if (authLoading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -173,9 +173,9 @@ export default function ExportPage() {
   if (!isStaff) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "32px" }}>
-        <div style={{ fontSize: "40px" }}>🔒</div>
-        <h2 style={{ color: "#f0fdf4", fontSize: "18px", fontWeight: 700 }}>Akses Dibatasi</h2>
-        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", textAlign: "center" }}>
+        <div style={{ fontSize: "40px" }}>??</div>
+        <h2 style={{ color: "var(--text-primary)", fontSize: "18px", fontWeight: 700 }}>Akses Dibatasi</h2>
+        <p style={{ color: "var(--text-muted)", fontSize: "14px", textAlign: "center" }}>
           Halaman ini hanya dapat diakses oleh dosen dan asisten.
         </p>
       </div>
@@ -186,40 +186,40 @@ export default function ExportPage() {
     <div style={{ minHeight: "100vh", padding: "28px 32px 48px", boxSizing: "border-box" }}>
       {/* Header */}
       <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ color: "#f0fdf4", fontSize: "28px", fontWeight: 700, lineHeight: 1.2 }}>Export Data</h1>
-        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", marginTop: "6px" }}>
+        <h1 style={{ color: "var(--text-primary)", fontSize: "28px", fontWeight: 700, lineHeight: 1.2 }}>Export Data</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "6px" }}>
           Unduh data absensi dalam format CSV atau cetak laporan
         </p>
       </div>
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "24px" }}>
-        <MiniStat label="Total Record" value={totalCount.toLocaleString("id-ID")} icon={<Archive size={15} style={{ color: "#34D399" }} />} />
-        <MiniStat label="Sesi Tersedia" value={sessionCount.toLocaleString("id-ID")} icon={<Calendar size={15} style={{ color: "#34D399" }} />} />
-        <MiniStat label="Export Terakhir" value="Hari Ini" icon={<Clock size={15} style={{ color: "#34D399" }} />} />
+        <MiniStat label="Total Record" value={totalCount.toLocaleString("id-ID")} icon={<Archive size={15} style={{ color: "#1A6B4A" }} />} />
+        <MiniStat label="Sesi Tersedia" value={sessionCount.toLocaleString("id-ID")} icon={<Calendar size={15} style={{ color: "#1A6B4A" }} />} />
+        <MiniStat label="Export Terakhir" value="Hari Ini" icon={<Clock size={15} style={{ color: "#1A6B4A" }} />} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "20px" }} className="export-grid">
-        {/* ── KIRI: Form Konfigurasi ── */}
+        {/* -- KIRI: Form Konfigurasi -- */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {/* Tipe Laporan */}
           <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <ClipboardList size={16} style={{ color: "#34D399" }} /> Tipe Laporan
+            <h3 style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <ClipboardList size={16} style={{ color: "#1A6B4A" }} /> Tipe Laporan
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {REPORT_TYPES.map((t) => (
                 <label key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "12px 14px", borderRadius: "12px", cursor: "pointer", transition: "all 0.2s",
-                  background: reportType === t.id ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${reportType === t.id ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.05)"}`,
+                  background: reportType === t.id ? "rgba(230,245,239,0.75)" : "rgba(255,255,255,0.7)",
+                  border: `1px solid ${reportType === t.id ? "rgba(168,216,196,0.65)" : "rgba(180,200,220,0.25)"}`,
                 }}>
-                  <div style={{ marginTop: "2px", width: 16, height: 16, borderRadius: "50%", border: `2px solid ${reportType === t.id ? "#10B981" : "rgba(16,185,129,0.3)"}`, background: reportType === t.id ? "#10B981" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ marginTop: "2px", width: 16, height: 16, borderRadius: "50%", border: `2px solid ${reportType === t.id ? "#2D9B6F" : "rgba(168,216,196,0.65)"}`, background: reportType === t.id ? "#2D9B6F" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {reportType === t.id && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
                   </div>
                   <input type="radio" name="reportType" value={t.id} checked={reportType === t.id} onChange={() => setReportType(t.id)} style={{ display: "none" }} />
                   <div>
-                    <p style={{ fontSize: "13px", fontWeight: 600, color: reportType === t.id ? "#34D399" : "#f0fdf4" }}>{t.label}</p>
-                    <p style={{ fontSize: "12px", color: "rgba(110,231,183,0.4)", marginTop: "2px" }}>{t.desc}</p>
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: reportType === t.id ? "#1A6B4A" : "var(--text-primary)" }}>{t.label}</p>
+                    <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>{t.desc}</p>
                   </div>
                 </label>
               ))}
@@ -228,29 +228,29 @@ export default function ExportPage() {
 
           {/* Filter */}
           <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <SlidersHorizontal size={16} style={{ color: "#34D399" }} /> Filter Data
+            <h3 style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <SlidersHorizontal size={16} style={{ color: "#1A6B4A" }} /> Filter Data
             </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Kelas Praktikum</label>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>Kelas Praktikum</label>
                 <div style={{ position: "relative" }}>
                   <select className="select-glass" value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)}>
                     <option value="all">Semua Kelas</option>
                     {classes.map((c) => (
-                      <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                      <option key={c.id} value={c.id}>{c.code} � {c.name}</option>
                     ))}
                   </select>
-                  <ChevronDown size={14} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(110,231,183,0.3)", pointerEvents: "none" }} />
+                  <ChevronDown size={14} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Dari Tanggal</label>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>Dari Tanggal</label>
                   <input type="date" className="input-glass" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Sampai Tanggal</label>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>Sampai Tanggal</label>
                   <input type="date" className="input-glass" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                 </div>
               </div>
@@ -258,14 +258,14 @@ export default function ExportPage() {
           </div>
         </div>
 
-        {/* ── KANAN: Export Actions ── */}
+        {/* -- KANAN: Export Actions -- */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {/* Export Buttons */}
           <div className="glass-strong rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "15px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Download size={16} style={{ color: "#34D399" }} /> Unduh Data
+            <h3 style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "15px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Download size={16} style={{ color: "#1A6B4A" }} /> Unduh Data
             </h3>
-            <p style={{ fontSize: "12px", color: "rgba(110,231,183,0.4)", marginBottom: "18px" }}>
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "18px" }}>
               Format yang tersedia
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -275,65 +275,65 @@ export default function ExportPage() {
                 disabled={exporting}
                 style={{
                   display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: exporting ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: exporting ? 0.7 : 1,
-                  background: exported ? "rgba(16,185,129,0.15)" : "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.08))",
-                  border: `1px solid ${exported ? "rgba(16,185,129,0.4)" : "rgba(16,185,129,0.25)"}`,
+                  background: exported ? "rgba(230,245,239,0.85)" : "linear-gradient(135deg, rgba(230,245,239,0.8), rgba(230,245,239,0.65))",
+                  border: `1px solid ${exported ? "rgba(168,216,196,0.8)" : "rgba(168,216,196,0.6)"}`,
                   width: "100%",
                 }}
               >
                 {exported
-                  ? <CheckCircle size={22} style={{ color: "#34D399", flexShrink: 0 }} />
+                  ? <CheckCircle size={22} style={{ color: "#1A6B4A", flexShrink: 0 }} />
                   : exporting
-                    ? <div style={{ width: 22, height: 22, border: "2px solid rgba(16,185,129,0.3)", borderTop: "2px solid #10B981", borderRadius: "50%", animation: "spin-ring 0.8s linear infinite", flexShrink: 0 }} />
-                    : <FileSpreadsheet size={22} style={{ color: "#34D399", flexShrink: 0 }} />
+                    ? <div style={{ width: 22, height: 22, border: "2px solid rgba(168,216,196,0.65)", borderTop: "2px solid #10B981", borderRadius: "50%", animation: "spin-ring 0.8s linear infinite", flexShrink: 0 }} />
+                    : <FileSpreadsheet size={22} style={{ color: "#1A6B4A", flexShrink: 0 }} />
                 }
                 <div style={{ textAlign: "left" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 600, color: "#f0fdf4" }}>
+                  <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                     {exported ? "Berhasil Diunduh!" : exporting ? "Mengekspor..." : "Export CSV"}
                   </p>
-                  <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                     Kompatibel dengan Microsoft Excel
                   </p>
                 </div>
-                {!exporting && !exported && <ArrowRight size={16} style={{ color: "rgba(110,231,183,0.4)", marginLeft: "auto" }} />}
+                {!exporting && !exported && <ArrowRight size={16} style={{ color: "var(--text-muted)", marginLeft: "auto" }} />}
               </button>
 
               {/* PDF (coming soon) */}
-              <button disabled style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: "not-allowed", opacity: 0.4, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", width: "100%" }}>
-                <FileText size={22} style={{ color: "rgba(110,231,183,0.4)", flexShrink: 0 }} />
+              <button disabled style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: "not-allowed", opacity: 0.4, background: "rgba(255,255,255,0.7)", border: "1px solid rgba(180,200,220,0.3)", width: "100%" }}>
+                <FileText size={22} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
                 <div style={{ textAlign: "left" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 600, color: "#f0fdf4" }}>Export PDF</p>
-                  <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.3)" }}>Segera hadir</p>
+                  <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>Export PDF</p>
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>Segera hadir</p>
                 </div>
               </button>
 
               {/* Print */}
-              <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: "pointer", transition: "all 0.2s", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", width: "100%" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(16,185,129,0.2)"; }}
+              <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", borderRadius: "12px", cursor: "pointer", transition: "all 0.2s", background: "rgba(255,255,255,0.7)", border: "1px solid rgba(180,200,220,0.3)", width: "100%" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(168,216,196,0.5)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}>
-                <Printer size={22} style={{ color: "rgba(110,231,183,0.5)", flexShrink: 0 }} />
+                <Printer size={22} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
                 <div style={{ textAlign: "left" }}>
-                  <p style={{ fontSize: "14px", fontWeight: 600, color: "#f0fdf4" }}>Cetak Laporan</p>
-                  <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.3)" }}>Buka dialog print browser</p>
+                  <p style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>Cetak Laporan</p>
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)" }}>Buka dialog print browser</p>
                 </div>
-                <ArrowRight size={16} style={{ color: "rgba(110,231,183,0.3)", marginLeft: "auto" }} />
+                <ArrowRight size={16} style={{ color: "var(--text-muted)", marginLeft: "auto" }} />
               </button>
             </div>
           </div>
 
           {/* Info card */}
           <div className="glass rounded-2xl" style={{ padding: "20px" }}>
-            <h3 style={{ color: "#f0fdf4", fontWeight: 700, fontSize: "14px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <History size={15} style={{ color: "#34D399" }} /> Panduan Export
+            <h3 style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "14px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <History size={15} style={{ color: "#1A6B4A" }} /> Panduan Export
             </h3>
             <ul style={{ display: "flex", flexDirection: "column", gap: "8px", paddingLeft: 0, listStyle: "none" }}>
               {[
                 "Filter kelas + tanggal sebelum ekspor",
-                "Hasil CSV UTF-8 BOM — aman untuk Excel",
+                "Hasil CSV UTF-8 BOM � aman untuk Excel",
                 "Maksimal 5.000 baris per ekspor",
                 "Klik Export CSV lalu pilih folder simpan",
               ].map((tip) => (
-                <li key={tip} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "rgba(110,231,183,0.5)" }}>
-                  <CheckCircle size={12} style={{ color: "#34D399", flexShrink: 0 }} />
+                <li key={tip} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--text-muted)" }}>
+                  <CheckCircle size={12} style={{ color: "#1A6B4A", flexShrink: 0 }} />
                   {tip}
                 </li>
               ))}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { Calendar, Users, BarChart3, Clock, Plus } from "lucide-react";
@@ -75,7 +75,7 @@ export default function DashboardPage() {
         maxWidth: "100%",
       }}
     >
-      {/* ── HEADER ── */}
+      {/* -- HEADER -- */}
       <div
         style={{
           display: "flex",
@@ -88,7 +88,7 @@ export default function DashboardPage() {
         <div>
           <h1
             style={{
-              color: "#f0fdf4",
+              color: "var(--text-primary)",
               fontSize: "28px",
               fontWeight: 700,
               lineHeight: 1.2,
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           >
             Dashboard Overview
           </h1>
-          <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", marginTop: "6px" }}>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "6px" }}>
             Monitoring live practicum attendance and session performance
           </p>
         </div>
@@ -108,14 +108,14 @@ export default function DashboardPage() {
             alignItems: "center",
             gap: "8px",
             padding: "10px 18px",
-            background: "linear-gradient(135deg, #059669, #10B981)",
+            background: "linear-gradient(135deg, #2D9B6F, #34B37E)",
             color: "#fff",
             fontSize: "14px",
             fontWeight: 600,
             borderRadius: "12px",
             border: "none",
             cursor: "pointer",
-            boxShadow: "0 4px 18px rgba(16,185,129,0.3)",
+            boxShadow: "0 4px 18px rgba(45,155,111,0.2)",
             whiteSpace: "nowrap",
             flexShrink: 0,
           }}
@@ -124,7 +124,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* ── STAT CARDS ── */}
+      {/* -- STAT CARDS -- */}
       <div
         style={{
           display: "grid",
@@ -134,13 +134,13 @@ export default function DashboardPage() {
         }}
         className="stat-grid"
       >
-        <StatCard icon={<Calendar size={18} style={{ color: "#34D399" }} />} label="Total Sesi" value={String(stats.totalSesi)} trend={5} />
-        <StatCard icon={<Users size={18} style={{ color: "#34D399" }} />} label="Mahasiswa" value={String(stats.mahasiswaCount)} trend={2} />
-        <StatCard icon={<BarChart3 size={18} style={{ color: stats.avgPct >= 70 ? "#34D399" : "#f87171" }} />} label="Rata-rata %" value={`${stats.avgPct}%`} trend={-1} />
-        <StatCard icon={<Clock size={18} style={{ color: "#34D399" }} />} label="Hari Ini" value={String(stats.hariIni)} trend={8} />
+        <StatCard icon={<Calendar size={18} style={{ color: "#1A6B4A" }} />} label="Total Sesi" value={String(stats.totalSesi)} trend={5} />
+        <StatCard icon={<Users size={18} style={{ color: "#1A6B4A" }} />} label="Mahasiswa" value={String(stats.mahasiswaCount)} trend={2} />
+        <StatCard icon={<BarChart3 size={18} style={{ color: stats.avgPct >= 70 ? "#1A6B4A" : "#C0392B" }} />} label="Rata-rata %" value={`${stats.avgPct}%`} trend={-1} />
+        <StatCard icon={<Clock size={18} style={{ color: "#1A6B4A" }} />} label="Hari Ini" value={String(stats.hariIni)} trend={8} />
       </div>
 
-      {/* ── ACTIVATE + LIVE FEED (staff only) ── */}
+      {/* -- ACTIVATE + LIVE FEED (staff only) -- */}
       {isStaff && (
         <div
           style={{
@@ -163,20 +163,20 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── SESSION MANAGER (staff only) ── */}
+      {/* -- SESSION MANAGER (staff only) -- */}
       {isStaff && (
         <div style={{ marginBottom: "24px" }}>
           <SessionManager />
         </div>
       )}
 
-      {/* ── ATTENDANCE TABLE ── */}
+      {/* -- ATTENDANCE TABLE -- */}
       <div>
         <div style={{ marginBottom: "12px" }}>
-          <h2 style={{ color: "#f0fdf4", fontSize: "15px", fontWeight: 700 }}>
+          <h2 style={{ color: "var(--text-primary)", fontSize: "15px", fontWeight: 700 }}>
             Riwayat Absensi
           </h2>
-          <p style={{ color: "rgba(110,231,183,0.4)", fontSize: "12px", marginTop: "4px" }}>
+          <p style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
             Semua data kehadiran mahasiswa
           </p>
         </div>

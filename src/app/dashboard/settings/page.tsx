@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import {
@@ -9,26 +9,26 @@ import {
 import { useSupabaseSession } from "@/hooks/useSupabaseSession";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
-/* ── SECTION WRAPPER ── */
+/* -- SECTION WRAPPER -- */
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="glass rounded-2xl" style={{ padding: "22px", marginBottom: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px", paddingBottom: "14px", borderBottom: "1px solid rgba(16,185,129,0.1)" }}>
-        <div style={{ width: 34, height: 34, borderRadius: "9px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
-        <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#f0fdf4" }}>{title}</h3>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px", paddingBottom: "14px", borderBottom: "1px solid rgba(180,200,220,0.3)" }}>
+        <div style={{ width: 34, height: 34, borderRadius: "9px", background: "rgba(230,245,239,0.8)", border: "1px solid rgba(168,216,196,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+        <h3 style={{ fontSize: "15px", fontWeight: 700, color: "var(--text-primary)" }}>{title}</h3>
       </div>
       {children}
     </div>
   );
 }
 
-/* ── TOGGLE ── */
+/* -- TOGGLE -- */
 function Toggle({ enabled, onChange, label, desc }: { enabled: boolean; onChange: (v: boolean) => void; label: string; desc?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
       <div style={{ flex: 1, marginRight: "16px" }}>
-        <p style={{ fontSize: "13px", fontWeight: 600, color: "#f0fdf4" }}>{label}</p>
-        {desc && <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)", marginTop: "2px" }}>{desc}</p>}
+        <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{label}</p>
+        {desc && <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{desc}</p>}
       </div>
       <button
         onClick={() => onChange(!enabled)}
@@ -49,7 +49,7 @@ function Toggle({ enabled, onChange, label, desc }: { enabled: boolean; onChange
   );
 }
 
-/* ── MAIN ── */
+/* -- MAIN -- */
 export default function SettingsPage() {
   const { profile, loading: authLoading } = useSupabaseSession();
   const role    = profile?.role ?? "mahasiswa";
@@ -87,7 +87,7 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  // ── Loading / Access Guard ──
+  // -- Loading / Access Guard --
   if (authLoading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -99,9 +99,9 @@ export default function SettingsPage() {
   if (!isStaff) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", padding: "32px" }}>
-        <div style={{ fontSize: "40px" }}>🔒</div>
-        <h2 style={{ color: "#f0fdf4", fontSize: "18px", fontWeight: 700 }}>Akses Dibatasi</h2>
-        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", textAlign: "center" }}>
+        <div style={{ fontSize: "40px" }}>??</div>
+        <h2 style={{ color: "var(--text-primary)", fontSize: "18px", fontWeight: 700 }}>Akses Dibatasi</h2>
+        <p style={{ color: "var(--text-muted)", fontSize: "14px", textAlign: "center" }}>
           Halaman ini hanya dapat diakses oleh dosen dan asisten.
         </p>
       </div>
@@ -113,8 +113,8 @@ export default function SettingsPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "28px", gap: "12px" }}>
         <div>
-          <h1 style={{ color: "#f0fdf4", fontSize: "28px", fontWeight: 700, lineHeight: 1.2 }}>Settings</h1>
-          <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px", marginTop: "6px" }}>Konfigurasi sistem absensi PresensLab</p>
+          <h1 style={{ color: "var(--text-primary)", fontSize: "28px", fontWeight: 700, lineHeight: 1.2 }}>Settings</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "6px" }}>Konfigurasi sistem absensi PresensLab</p>
         </div>
         <button
           onClick={handleSave}
@@ -127,27 +127,27 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }} className="settings-grid">
-        {/* ── KOLOM KIRI ── */}
+        {/* -- KOLOM KIRI -- */}
         <div>
           {/* Geolocation */}
-          <Section title="Geolocation & GPS" icon={<MapPin size={16} style={{ color: "#34D399" }} />}>
+          <Section title="Geolocation & GPS" icon={<MapPin size={16} style={{ color: "#1A6B4A" }} />}>
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>
                     Radius Default (meter)
                   </label>
                   <input type="number" className="input-glass" min={10} max={500} value={defaultRadius} onChange={(e) => setDefaultRadius(Number(e.target.value))} />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>
                     Durasi Default (menit)
                   </label>
                   <input type="number" className="input-glass" min={5} max={180} value={defaultDuration} onChange={(e) => setDefaultDuration(Number(e.target.value))} />
                 </div>
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>
                   GPS Timeout (detik)
                 </label>
                 <input type="number" className="input-glass" min={3} max={30} value={gpsTimeout} onChange={(e) => setGpsTimeout(Number(e.target.value))} />
@@ -158,19 +158,19 @@ export default function SettingsPage() {
           </Section>
 
           {/* Notifications */}
-          <Section title="Notifikasi" icon={<Bell size={16} style={{ color: "#34D399" }} />}>
+          <Section title="Notifikasi" icon={<Bell size={16} style={{ color: "#1A6B4A" }} />}>
             <Toggle enabled={notifWarning} onChange={setNotifWarning} label="Peringatan Sesi Hampir Habis" desc={`Alert ${warningMinutes} menit sebelum sesi berakhir`} />
             <div style={{ paddingLeft: "8px", paddingTop: "8px", paddingBottom: "8px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Menit sebelum habis</label>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>Menit sebelum habis</label>
               <input type="number" className="input-glass" min={1} max={30} value={warningMinutes} onChange={(e) => setWarningMinutes(Number(e.target.value))} disabled={!notifWarning} style={{ opacity: notifWarning ? 1 : 0.4 }} />
             </div>
             <Toggle enabled={notifCheckin} onChange={setNotifCheckin} label="Notifikasi Setiap Check-in" desc="Alert browser tiap ada mahasiswa check-in" />
           </Section>
 
           {/* Rate Limiting */}
-          <Section title="Rate Limiting" icon={<Sliders size={16} style={{ color: "#34D399" }} />}>
+          <Section title="Rate Limiting" icon={<Sliders size={16} style={{ color: "#1A6B4A" }} />}>
             <div style={{ marginBottom: "12px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>
                 Maks. request per user per menit
               </label>
               <input type="number" className="input-glass" min={1} max={10} value={rateLimit} onChange={(e) => setRateLimit(Number(e.target.value))} />
@@ -186,23 +186,23 @@ export default function SettingsPage() {
           </Section>
         </div>
 
-        {/* ── KOLOM KANAN ── */}
+        {/* -- KOLOM KANAN -- */}
         <div>
           {/* Authentication */}
-          <Section title="Autentikasi & Whitelist" icon={<Shield size={16} style={{ color: "#34D399" }} />}>
+          <Section title="Autentikasi & Whitelist" icon={<Shield size={16} style={{ color: "#1A6B4A" }} />}>
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>
                   Domain Email yang Diizinkan
                 </label>
                 <div style={{ position: "relative" }}>
-                  <Globe size={13} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(110,231,183,0.3)" }} />
+                  <Globe size={13} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                   <input className="input-glass" style={{ paddingLeft: 34 }} placeholder="stmik.ac.id" value={allowedDomain} onChange={(e) => setAllowedDomain(e.target.value)} />
                 </div>
               </div>
               <Toggle enabled={domainOnly} onChange={setDomainOnly} label="Mode Domain Only" desc="Izinkan semua email dengan domain di atas (tanpa whitelist individual)" />
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>
                   Whitelist Email (satu per baris)
                 </label>
                 <textarea
@@ -214,7 +214,7 @@ export default function SettingsPage() {
                   disabled={domainOnly}
                   placeholder="user@stmik.ac.id"
                 />
-                <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.3)", marginTop: "6px" }}>
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" }}>
                   {allowedEmails.split("\n").filter((e) => e.trim()).length} email terdaftar
                 </p>
               </div>
@@ -222,22 +222,22 @@ export default function SettingsPage() {
           </Section>
 
           {/* Database / System */}
-          <Section title="Sistem & Database" icon={<Database size={16} style={{ color: "#34D399" }} />}>
+          <Section title="Sistem & Database" icon={<Database size={16} style={{ color: "#1A6B4A" }} />}>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div style={{ padding: "14px", borderRadius: "12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>Supabase Project URL</label>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>Supabase Project URL</label>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input className="input-glass" defaultValue="https://xxxx.supabase.co" readOnly style={{ flex: 1, opacity: 0.6, fontSize: "12px" }} />
-                  <button style={{ padding: "8px 10px", borderRadius: "9px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", color: "#34D399", cursor: "pointer" }}>
+                  <button style={{ padding: "8px 10px", borderRadius: "9px", background: "rgba(230,245,239,0.7)", border: "1px solid rgba(168,216,196,0.5)", color: "#1A6B4A", cursor: "pointer" }}>
                     <Copy size={13} />
                   </button>
                 </div>
               </div>
               <div style={{ padding: "14px", borderRadius: "12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "rgba(110,231,183,0.5)", marginBottom: "6px" }}>NEXTAUTH_SECRET</label>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px" }}>NEXTAUTH_SECRET</label>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <input className="input-glass" type={showSecret ? "text" : "password"} defaultValue="randomly_generated_secret_here" readOnly style={{ flex: 1, opacity: 0.6, fontSize: "12px" }} />
-                  <button onClick={() => setShowSecret(!showSecret)} style={{ padding: "8px 10px", borderRadius: "9px", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", color: "#34D399", cursor: "pointer" }}>
+                  <button onClick={() => setShowSecret(!showSecret)} style={{ padding: "8px 10px", borderRadius: "9px", background: "rgba(230,245,239,0.7)", border: "1px solid rgba(168,216,196,0.5)", color: "#1A6B4A", cursor: "pointer" }}>
                     {showSecret ? <EyeOff size={13} /> : <Eye size={13} />}
                   </button>
                 </div>
@@ -245,14 +245,14 @@ export default function SettingsPage() {
 
               {/* Danger Zone */}
               <div style={{ padding: "14px", borderRadius: "12px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", marginTop: "4px" }}>
-                <p style={{ fontSize: "12px", fontWeight: 700, color: "#f87171", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <AlertTriangle size={13} style={{ color: "#f87171" }} /> Zona Berbahaya
+                <p style={{ fontSize: "12px", fontWeight: 700, color: "#C0392B", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <AlertTriangle size={13} style={{ color: "#C0392B" }} /> Zona Berbahaya
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <button style={{ padding: "9px 14px", borderRadius: "9px", background: "transparent", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "12px", fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+                  <button style={{ padding: "9px 14px", borderRadius: "9px", background: "transparent", border: "1px solid rgba(239,68,68,0.3)", color: "#C0392B", fontSize: "12px", fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
                     Hapus Semua Data Absensi
                   </button>
-                  <button style={{ padding: "9px 14px", borderRadius: "9px", background: "transparent", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontSize: "12px", fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+                  <button style={{ padding: "9px 14px", borderRadius: "9px", background: "transparent", border: "1px solid rgba(239,68,68,0.3)", color: "#C0392B", fontSize: "12px", fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
                     Reset Database ke Default
                   </button>
                 </div>

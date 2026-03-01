@@ -15,9 +15,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { GlassButton } from "@/components/ui/GlassButton";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { Toast } from "@/components/ui/Toast";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useToast } from "@/hooks/useToast";
 
 type ActivateState = "idle" | "active" | "expired";
 
@@ -47,8 +45,6 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const realtimeChannelRef = useRef<ReturnType<ReturnType<typeof createSupabaseBrowserClient>["channel"]> | null>(null);
-  const { toasts, toast, dismissToast } = useToast();
 
   // ── Fetch available (inactive) sessions ──────────────────────
   useEffect(() => {
@@ -95,47 +91,6 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
     poll();
     pollRef.current = setInterval(poll, 10_000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [state, activeSessId]);
-
-  // ── Realtime subscription: sessions UPDATE (B6.4) ────────────
-  useEffect(() => {
-    if (state !== "active" || !activeSessId) return;
-
-    const supabase = createSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`session-updates:${activeSessId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "sessions",
-          filter: `id=eq.${activeSessId}`,
-        },
-        (payload) => {
-          const updated = payload.new as { is_active: boolean; expires_at: string | null };
-          if (!updated.is_active) {
-            // Session was deactivated externally
-            handleExpired();
-            return;
-          }
-          if (updated.expires_at) {
-            setExpiresAt(new Date(updated.expires_at));
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          toast.error("Koneksi Realtime terputus. Data mungkin tidak langsung diperbarui.");
-        }
-      });
-
-    realtimeChannelRef.current = channel;
-    return () => {
-      supabase.removeChannel(channel);
-      realtimeChannelRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, activeSessId]);
 
   const getGps = useCallback(() => {
@@ -527,20 +482,6 @@ export function ActivateAttendance({ onStateChange }: ActivateAttendanceProps) {
           >
             🟢 Aktifkan Sesi Baru
           </GlassButton>
-        </div>
-      )}
-      {/* Reconnect toasts (B6.6) */}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
-          {toasts.map((t) => (
-            <Toast
-              key={t.id}
-              id={t.id}
-              message={t.message}
-              type={t.type}
-              onDismiss={dismissToast}
-            />
-          ))}
         </div>
       )}
     </GlassCard>

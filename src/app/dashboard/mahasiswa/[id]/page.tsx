@@ -47,7 +47,7 @@ function getInitial(name: string | null) {
 
 function AttBar({ pct, minPct }: { pct: number; minPct: number }) {
   const eligible = pct >= minPct;
-  const color = eligible ? "#34D399" : pct >= 60 ? "#facc15" : "#f87171";
+  const color = eligible ? "#1A6B4A" : pct >= 60 ? "#facc15" : "#C0392B";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
       <div style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden" }}>
@@ -149,7 +149,7 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", padding: "28px 32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <p style={{ color: "rgba(110,231,183,0.5)", fontSize: "14px" }}>Memuat data mahasiswa...</p>
+        <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>Memuat data mahasiswa...</p>
       </div>
     );
   }
@@ -157,10 +157,10 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
   if (error || !profile) {
     return (
       <div style={{ minHeight: "100vh", padding: "28px 32px" }}>
-        <Link href="/dashboard/mahasiswa" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "rgba(110,231,183,0.5)", textDecoration: "none", marginBottom: "24px" }}>
+        <Link href="/dashboard/mahasiswa" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "var(--text-muted)", textDecoration: "none", marginBottom: "24px" }}>
           <ChevronLeft size={14} /> Kembali ke Mahasiswa
         </Link>
-        <p style={{ color: "#f87171" }}>{error ?? "Pengguna tidak ditemukan."}</p>
+        <p style={{ color: "#C0392B" }}>{error ?? "Pengguna tidak ditemukan."}</p>
       </div>
     );
   }
@@ -176,34 +176,34 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "24px" }}>
         <Link
           href="/dashboard/mahasiswa"
-          style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", color: "rgba(110,231,183,0.5)", textDecoration: "none", transition: "color 0.2s" }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "#34D399")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "rgba(110,231,183,0.5)")}
+          style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "13px", color: "var(--text-muted)", textDecoration: "none", transition: "color 0.2s" }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = "#1A6B4A")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = "var(--text-muted)")}
         >
           <ChevronLeft size={14} /> Mahasiswa & Dosen
         </Link>
-        <span style={{ color: "rgba(110,231,183,0.2)" }}>/</span>
-        <span style={{ fontSize: "13px", color: "#f0fdf4" }}>{profile.full_name ?? "Detail"}</span>
+        <span style={{ color: "var(--text-muted)" }}>/</span>
+        <span style={{ fontSize: "13px", color: "var(--text-primary)" }}>{profile.full_name ?? "Detail"}</span>
       </div>
 
       {/* Profile Header */}
       <div className="glass rounded-2xl" style={{ padding: "24px 28px", marginBottom: "20px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#059669,#10B981)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#2D9B6F,#34B37E)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: 700, color: "#fff", flexShrink: 0 }}>
               {getInitial(profile.full_name)}
             </div>
             <div>
-              <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#f0fdf4", marginBottom: "4px" }}>
+              <h1 style={{ fontSize: "22px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
                 {profile.full_name ?? "—"}
               </h1>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "13px", color: "rgba(110,231,183,0.5)" }}>NIM/NIP: {profile.nim ?? "—"}</span>
+                <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>NIM/NIP: {profile.nim ?? "—"}</span>
                 <span style={{
                   fontSize: "12px", padding: "2px 9px", borderRadius: "20px", fontWeight: 700,
-                  background: profile.role === "dosen" ? "rgba(234,179,8,0.12)" : "rgba(16,185,129,0.08)",
-                  color: profile.role === "dosen" ? "#facc15" : "#34D399",
-                  border: `1px solid ${profile.role === "dosen" ? "rgba(234,179,8,0.25)" : "rgba(16,185,129,0.2)"}`,
+                  background: profile.role === "dosen" ? "rgba(234,179,8,0.12)" : "rgba(230,245,239,0.65)",
+                  color: profile.role === "dosen" ? "#facc15" : "#1A6B4A",
+                  border: `1px solid ${profile.role === "dosen" ? "rgba(234,179,8,0.25)" : "rgba(168,216,196,0.5)"}`,
                 }}>
                   {profile.role}
                 </span>
@@ -212,9 +212,9 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
           </div>
           <button
             onClick={fetchData}
-            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", background: "transparent", border: "1px solid rgba(16,185,129,0.2)", color: "rgba(110,231,183,0.5)", cursor: "pointer", fontSize: "12px", transition: "all 0.2s" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(16,185,129,0.4)"; (e.currentTarget as HTMLElement).style.color = "#34D399"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(16,185,129,0.2)"; (e.currentTarget as HTMLElement).style.color = "rgba(110,231,183,0.5)"; }}
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", background: "transparent", border: "1px solid rgba(168,216,196,0.5)", color: "var(--text-muted)", cursor: "pointer", fontSize: "12px", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(168,216,196,0.8)"; (e.currentTarget as HTMLElement).style.color = "#1A6B4A"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(168,216,196,0.5)"; (e.currentTarget as HTMLElement).style.color = "var(--text-muted)"; }}
           >
             <RefreshCw size={13} /> Refresh
           </button>
@@ -223,16 +223,16 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
         {/* Summary stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginTop: "20px" }}>
           {[
-            { label: "Kelas Diikuti", value: classStats.length, icon: <BookOpen size={14} style={{ color: "#34D399" }} /> },
-            { label: "Rata-rata Kehadiran", value: `${avgPct}%`, icon: <GraduationCap size={14} style={{ color: "#34D399" }} /> },
-            { label: "Kelas Lulus", value: `${eligibleCount}/${classStats.length}`, icon: <CheckCircle size={14} style={{ color: eligibleCount === classStats.length && classStats.length > 0 ? "#34D399" : "#facc15" }} /> },
+            { label: "Kelas Diikuti", value: classStats.length, icon: <BookOpen size={14} style={{ color: "#1A6B4A" }} /> },
+            { label: "Rata-rata Kehadiran", value: `${avgPct}%`, icon: <GraduationCap size={14} style={{ color: "#1A6B4A" }} /> },
+            { label: "Kelas Lulus", value: `${eligibleCount}/${classStats.length}`, icon: <CheckCircle size={14} style={{ color: eligibleCount === classStats.length && classStats.length > 0 ? "#1A6B4A" : "#facc15" }} /> },
           ].map((s) => (
-            <div key={s.label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.1)" }}>
+            <div key={s.label} style={{ padding: "12px 14px", borderRadius: "12px", background: "rgba(16,185,129,0.04)", border: "1px solid rgba(180,200,220,0.3)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                 {s.icon}
-                <span style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)" }}>{s.label}</span>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>{s.label}</span>
               </div>
-              <p style={{ fontSize: "20px", fontWeight: 700, color: "#f0fdf4", fontVariantNumeric: "tabular-nums" }}>{s.value}</p>
+              <p style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{s.value}</p>
             </div>
           ))}
         </div>
@@ -241,11 +241,11 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         {/* Enrolled Classes */}
         <div className="glass rounded-2xl" style={{ padding: "20px 22px" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#10B981", letterSpacing: "0.07em", marginBottom: "14px" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#2D9B6F", letterSpacing: "0.07em", marginBottom: "14px" }}>
             KELAS YANG DIIKUTI
           </h2>
           {classStats.length === 0 ? (
-            <p style={{ fontSize: "13px", color: "rgba(110,231,183,0.3)", textAlign: "center", padding: "20px 0" }}>
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
               Belum terdaftar di kelas manapun.
             </p>
           ) : (
@@ -254,29 +254,29 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
                 <Link
                   key={cs.class_id}
                   href={`/dashboard/kelas/${cs.class_id}`}
-                  style={{ textDecoration: "none", display: "block", padding: "12px 14px", borderRadius: "12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(16,185,129,0.1)", transition: "border-color 0.2s" }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(16,185,129,0.3)")}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(16,185,129,0.1)")}
+                  style={{ textDecoration: "none", display: "block", padding: "12px 14px", borderRadius: "12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(180,200,220,0.3)", transition: "border-color 0.2s" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(168,216,196,0.65)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(230,245,239,0.75)")}
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "8px" }}>
                     <div>
-                      <p style={{ fontSize: "13px", fontWeight: 600, color: "#f0fdf4" }}>{cs.class_code}</p>
-                      <p style={{ fontSize: "11px", color: "rgba(110,231,183,0.4)", marginTop: "2px" }}>{cs.class_name}</p>
+                      <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{cs.class_code}</p>
+                      <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{cs.class_name}</p>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
                       <span style={{ fontSize: "10px", padding: "1px 7px", borderRadius: "20px",
-                        background: "rgba(16,185,129,0.08)", color: "#34D399", border: "1px solid rgba(16,185,129,0.15)", fontWeight: 600 }}>
+                        background: "rgba(230,245,239,0.7)", color: "#1A6B4A", border: "1px solid rgba(168,216,196,0.45)", fontWeight: 600 }}>
                         {cs.peran}
                       </span>
                       {!cs.is_eligible && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "#f87171" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "#C0392B" }}>
                           <AlertTriangle size={10} /> Di bawah min.
                         </span>
                       )}
                     </div>
                   </div>
                   <AttBar pct={cs.att_pct} minPct={cs.min_pct} />
-                  <p style={{ fontSize: "10px", color: "rgba(110,231,183,0.3)", marginTop: "5px" }}>
+                  <p style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "5px" }}>
                     {cs.hadir_count} hadir dari {cs.total_planned} sesi · min. {cs.min_pct}%
                   </p>
                 </Link>
@@ -287,11 +287,11 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Recent Attendance */}
         <div className="glass rounded-2xl" style={{ padding: "20px 22px" }}>
-          <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#10B981", letterSpacing: "0.07em", marginBottom: "14px" }}>
+          <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#2D9B6F", letterSpacing: "0.07em", marginBottom: "14px" }}>
             RIWAYAT ABSENSI TERBARU
           </h2>
           {recentAtt.length === 0 ? (
-            <p style={{ fontSize: "13px", color: "rgba(110,231,183,0.3)", textAlign: "center", padding: "20px 0" }}>
+            <p style={{ fontSize: "13px", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
               Belum ada riwayat absensi.
             </p>
           ) : (
@@ -299,25 +299,25 @@ export default function MahasiswaDetailPage({ params }: { params: Promise<{ id: 
               {recentAtt.map((a) => (
                 <div
                   key={a.id}
-                  style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(16,185,129,0.08)" }}
+                  style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(230,245,239,0.65)" }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#34D399" }}>{a.class_code}</span>
-                      <span style={{ fontSize: "11px", color: "#f0fdf4" }}>{a.session_title}</span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#1A6B4A" }}>{a.class_code}</span>
+                      <span style={{ fontSize: "11px", color: "var(--text-primary)" }}>{a.session_title}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "rgba(110,231,183,0.4)" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "var(--text-muted)" }}>
                         <Calendar size={10} />
                         {a.session_date ? new Date(a.session_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                       </span>
                       {a.checked_in_at && (
-                        <span style={{ fontSize: "10px", color: "rgba(110,231,183,0.4)" }}>
+                        <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>
                           {new Date(a.checked_in_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB
                         </span>
                       )}
                       {a.distance_meter !== null && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "rgba(110,231,183,0.4)" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "10px", color: "var(--text-muted)" }}>
                           <MapPin size={10} /> {a.distance_meter}m
                         </span>
                       )}
