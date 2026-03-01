@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
+import { logger } from "@/lib/logger";
 import { Toast } from "@/components/ui/Toast";
 import {
   ChevronLeft, FlaskConical, Users, Plus, X,
@@ -675,7 +676,7 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
     // (Zod v4 .uuid() rejects non-RFC-4122-version UUIDs, so we use the loose format check)
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!UUID_RE.test(userId) || !UUID_RE.test(sessionId)) {
-      console.error("[handleAttendanceOverride] Invalid UUID(s):", { userId, sessionId });
+      logger.error("[handleAttendanceOverride] Invalid UUID(s):", { userId, sessionId });
       toast.error(`Data tidak valid: ID bukan UUID yang valid.`);
       return;
     }

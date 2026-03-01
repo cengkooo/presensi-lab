@@ -28,6 +28,13 @@ export default function RootLayout({
         <meta name="theme-color" content="#0B1F1A" />
       </head>
       <body className="antialiased" style={{ fontFamily: "var(--font-inter), Inter, sans-serif" }}>
+        {/* Self-XSS warning — tampil di console browser production */}
+        <script dangerouslySetInnerHTML={{ __html: `
+if (typeof window !== 'undefined') {
+  console.log('%cSTOP!', 'color:#ef4444;font-size:64px;font-weight:900;');
+  console.log('%cIni adalah fitur browser untuk developer.\\nJangan masukkan atau tempelkan kode apapun di sini.\\nIni bisa membahayakan akun dan data kamu (Self-XSS Attack).', 'font-size:16px;color:#1a1a1a;');
+}
+        ` }} />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
