@@ -46,15 +46,9 @@ export async function middleware(request: NextRequest) {
   return response
 }
 
+// TEMP: matcher dikosongkan sementara selama incident Vercel dxb1 (Edge Middleware global deployment).
+// API routes tetap aman via getAuthUser(), dashboard redirect via AuthContext client-side.
+// Kembalikan matcher di bawah setelah incident selesai.
 export const config = {
-  matcher: [
-    /*
-     * Match semua path kecuali:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico, sitemap.xml, robots.txt
-     * - file extensions (png, jpg, dll)
-     */
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: [],
 }
