@@ -1,10 +1,23 @@
 // ======================================================
-// GET /api/classes/[id]
-// Detail kelas + sesi + enrollment count
+// GET    /api/classes/[id]  — detail kelas
+// PUT    /api/classes/[id]  — update kelas (staff only)
+// DELETE /api/classes/[id]  — hapus kelas  (staff only)
 // ======================================================
 import { NextRequest } from "next/server"
-import { ok, err, E, getAuthUser } from "@/lib/apiHelpers"
-import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { ok, err, E, getAuthUser, getUserRole, isStaffRole } from "@/lib/apiHelpers"
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server"
+import { z } from "zod"
+
+const UpdateClassSchema = z.object({
+  name:                   z.string().min(2).optional(),
+  code:                   z.string().min(1).optional(),
+  semester:               z.string().min(2).optional(),
+  lecturer:               z.string().min(2).optional(),
+  location:               z.string().min(2).optional(),
+  total_sessions_planned: z.number().int().min(1).max(100).optional(),
+  min_attendance_pct:     z.number().int().min(1).max(100).optional(),
+  description:            z.string().optional(),
+})
 
 export async function GET(
   _request: NextRequest,
@@ -56,4 +69,76 @@ export async function GET(
     enrollment_count: enrollmentCount ?? 0,
     my_peran:         myEnrollment?.peran ?? null,
   })
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  const { user } = await getAuthUser()
+  if (!user) return err(E.UNAUTHORIZED, "Kamu harus login.", 401)
+
+  const role = await getUserRole(user.id)
+  if (!isStaffRole(role)) {
+    return err(E.FORBIDDEN, "Hanya dosen atau asisten yang dapat mengedit kelas.", 403)
+  }
+
+  let body: unknown
+  try { body = await request.json() } catch {
+    return err(E.VALIDATION_ERROR, "Request body tidak valid.", 400)
+  }
+
+  const parsed = UpdateClassSchema.safeParse(body)
+  if (!parsed.success) {
+    return err(E.VALIDATION_ERROR, "Data tidak valid.", 400, parsed.error.flatten())
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createSupabaseServiceClient() as any
+
+  const { data: updated, error: updateErr } = await service
+    .from("classes")
+    .update(parsed.data)
+    .eq("id", id)
+    .select()
+    .single()
+
+  if (updateErr) {
+    console.error("[classes PUT]", updateErr.message)
+    return err(E.INTERNAL_ERROR, "Gagal memperbarui kelas.", 500)
+  }
+
+  return ok(updated)
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  const { user } = await getAuthUser()
+  if (!user) return err(E.UNAUTHORIZED, "Kamu harus login.", 401)
+
+  const role = await getUserRole(user.id)
+  if (!isStaffRole(role)) {
+    return err(E.FORBIDDEN, "Hanya dosen atau asisten yang dapat menghapus kelas.", 403)
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const service = createSupabaseServiceClient() as any
+
+  const { error: deleteErr } = await service
+    .from("classes")
+    .delete()
+    .eq("id", id)
+
+  if (deleteErr) {
+    console.error("[classes DELETE]", deleteErr.message)
+    return err(E.INTERNAL_ERROR, "Gagal menghapus kelas.", 500)
+  }
+
+  return ok({ id })
 }

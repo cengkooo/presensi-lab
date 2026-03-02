@@ -4,7 +4,7 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   FlaskConical, Users, ChevronRight,
-  CheckCircle, Radio, Plus, X,
+  CheckCircle, Radio, Plus, X, Pencil, Trash2,
 } from "lucide-react";
 import type { PraktikumClass } from "@/types";
 
@@ -73,6 +73,19 @@ export default function KelasPage() {
   const [submitting, setSubmitting] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Edit & Delete state
+  const [editingClass, setEditingClass] = useState<PraktikumClass | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState<NewClassForm>(EMPTY_FORM);
+  const [editErrors, setEditErrors] = useState<Partial<NewClassForm>>({});
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const editModalRef = useRef<HTMLDivElement>(null);
+
+  const [deletingClass, setDeletingClass] = useState<PraktikumClass | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteModalRef = useRef<HTMLDivElement>(null);
+
   // ── Fetch classes from API ────────────────────────────────────────────────
   const fetchClasses = useCallback(async () => {
     const res = await fetch("/api/classes", { credentials: "same-origin" });
@@ -98,7 +111,7 @@ export default function KelasPage() {
   const setField = (key: keyof NewClassForm) => (val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  // Close on backdrop click
+  // Close on backdrop click / Escape — create modal
   useEffect(() => {
     if (!showModal) return;
     const handler = (e: MouseEvent) => {
@@ -107,14 +120,134 @@ export default function KelasPage() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showModal]);
-
-  // Close on Escape
   useEffect(() => {
     if (!showModal) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setShowModal(false); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [showModal]);
+
+  // Close on backdrop click / Escape — edit modal
+  useEffect(() => {
+    if (!showEditModal) return;
+    const handler = (e: MouseEvent) => {
+      if (editModalRef.current && !editModalRef.current.contains(e.target as Node)) setShowEditModal(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showEditModal]);
+  useEffect(() => {
+    if (!showEditModal) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setShowEditModal(false); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showEditModal]);
+
+  // Close on backdrop click / Escape — delete modal
+  useEffect(() => {
+    if (!showDeleteModal) return;
+    const handler = (e: MouseEvent) => {
+      if (deleteModalRef.current && !deleteModalRef.current.contains(e.target as Node)) setShowDeleteModal(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showDeleteModal]);
+  useEffect(() => {
+    if (!showDeleteModal) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setShowDeleteModal(false); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [showDeleteModal]);
+
+  // ── Edit helpers ──────────────────────────────────────────────────────────
+  function openEditModal(kelas: PraktikumClass) {
+    setEditingClass(kelas);
+    setEditForm({
+      name:                   kelas.name,
+      code:                   kelas.code,
+      semester:               kelas.semester,
+      lecturer:               kelas.lecturer,
+      location:               kelas.location,
+      total_sessions_planned: String(kelas.total_sessions_planned),
+      min_attendance_pct:     String(kelas.min_attendance_pct),
+    });
+    setEditErrors({});
+    setShowEditModal(true);
+  }
+
+  function validateEdit(): boolean {
+    const errs: Partial<NewClassForm> = {};
+    if (!editForm.name.trim())     errs.name     = "Nama kelas wajib diisi";
+    if (!editForm.code.trim())     errs.code     = "Kode kelas wajib diisi";
+    if (!editForm.semester.trim()) errs.semester = "Semester wajib diisi";
+    if (!editForm.lecturer.trim()) errs.lecturer = "Nama dosen wajib diisi";
+    if (!editForm.location.trim()) errs.location = "Lokasi wajib diisi";
+    const sesi = parseInt(editForm.total_sessions_planned, 10);
+    if (!sesi || sesi < 1)         errs.total_sessions_planned = "Jumlah sesi minimal 1";
+    const minPct = parseInt(editForm.min_attendance_pct, 10);
+    if (!minPct || minPct < 1 || minPct > 100) errs.min_attendance_pct = "Masukkan nilai 1–100";
+    setEditErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  async function handleEditSubmit() {
+    if (!editingClass || !validateEdit()) return;
+    setEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/classes/${editingClass.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:                   editForm.name.trim(),
+          code:                   editForm.code.trim().toUpperCase(),
+          semester:               editForm.semester.trim(),
+          lecturer:               editForm.lecturer.trim(),
+          location:               editForm.location.trim(),
+          total_sessions_planned: parseInt(editForm.total_sessions_planned, 10),
+          min_attendance_pct:     parseInt(editForm.min_attendance_pct, 10),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        fetchClasses();
+        setShowEditModal(false);
+      } else {
+        alert(json.message ?? "Gagal memperbarui kelas.");
+      }
+    } catch {
+      alert("Gagal terhubung ke server.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  // ── Delete helpers ─────────────────────────────────────────────────────────
+  function openDeleteModal(kelas: PraktikumClass) {
+    setDeletingClass(kelas);
+    setShowDeleteModal(true);
+  }
+
+  async function handleDelete() {
+    if (!deletingClass) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/classes/${deletingClass.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) {
+        fetchClasses();
+        setShowDeleteModal(false);
+      } else {
+        alert(json.message ?? "Gagal menghapus kelas.");
+      }
+    } catch {
+      alert("Gagal terhubung ke server.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const setEditField = (key: keyof NewClassForm) => (val: string) =>
+    setEditForm((f) => ({ ...f, [key]: val }));
 
   function validate(): boolean {
     const errs: Partial<NewClassForm> = {};
@@ -243,17 +376,17 @@ export default function KelasPage() {
           </div>
         )}
         {classes.map(({ kelas }) => (
-          <Link key={kelas.id} href={`/dashboard/kelas/${kelas.id}`}
-            style={{ textDecoration: "none" }}>
-            <div
-              className="glass glass-hover rounded-2xl"
-              style={{ padding: "20px 22px", cursor: "pointer", display: "flex", alignItems: "center", gap: "20px" }}
-            >
+          <div key={kelas.id} className="glass rounded-2xl"
+            style={{ padding: "20px 22px", display: "flex", alignItems: "center", gap: "20px" }}>
+
+            {/* Clickable area → detail page */}
+            <Link href={`/dashboard/kelas/${kelas.id}`}
+              style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "20px", flex: 1, minWidth: 0 }}
+              className="kelas-card-link">
               {/* Icon */}
               <div style={{ width: 48, height: 48, borderRadius: "14px", background: "linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.1))", border: "1px solid rgba(16,185,129,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <FlaskConical size={22} style={{ color: "#34D399" }} />
               </div>
-
               {/* Main info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" }}>
@@ -266,10 +399,55 @@ export default function KelasPage() {
                   {kelas.lecturer} · {kelas.semester} · {kelas.location}
                 </p>
               </div>
-
               <ChevronRight size={18} style={{ color: "rgba(110,231,183,0.3)", flexShrink: 0 }} />
+            </Link>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              <button
+                onClick={(e) => { e.preventDefault(); openEditModal(kelas); }}
+                title="Edit kelas"
+                style={{
+                  width: 32, height: 32, borderRadius: 8, cursor: "pointer",
+                  background: "rgba(16,185,129,0.08)",
+                  border: "1px solid rgba(16,185,129,0.2)",
+                  color: "#34D399", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(16,185,129,0.22)";
+                  e.currentTarget.style.borderColor = "rgba(16,185,129,0.5)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(16,185,129,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(16,185,129,0.2)";
+                }}
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                onClick={(e) => { e.preventDefault(); openDeleteModal(kelas); }}
+                title="Hapus kelas"
+                style={{
+                  width: 32, height: 32, borderRadius: 8, cursor: "pointer",
+                  background: "rgba(248,113,113,0.08)",
+                  border: "1px solid rgba(248,113,113,0.2)",
+                  color: "#f87171", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(248,113,113,0.22)";
+                  e.currentTarget.style.borderColor = "rgba(248,113,113,0.5)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(248,113,113,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(248,113,113,0.2)";
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
 
@@ -390,10 +568,151 @@ export default function KelasPage() {
         </div>
       )}
 
+      {/* ── Modal: Edit Kelas ──────────────────────────────────────────────*/}
+      {showEditModal && editingClass && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1000,
+          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 16,
+        }}>
+          <div
+            ref={editModalRef}
+            className="glass rounded-2xl"
+            style={{
+              width: "100%", maxWidth: 540,
+              padding: "28px 28px 24px",
+              border: "1px solid rgba(16,185,129,0.2)",
+              maxHeight: "90vh", overflowY: "auto",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Pencil size={16} style={{ color: "#34D399" }} />
+                </div>
+                <div>
+                  <h2 style={{ color: "#f0fdf4", fontSize: 17, fontWeight: 700, margin: 0 }}>Edit Kelas</h2>
+                  <p style={{ color: "rgba(110,231,183,0.45)", fontSize: 12, margin: 0 }}>{editingClass.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowEditModal(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(110,231,183,0.5)", lineHeight: 1, padding: 4, borderRadius: 6 }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Field label="Nama Kelas" required value={editForm.name} onChange={setEditField("name")}
+                placeholder="cth: Praktikum Jaringan Komputer" />
+              {editErrors.name && <p style={{ fontSize: 11, color: "#f87171", marginTop: -10 }}>{editErrors.name}</p>}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <Field label="Kode Kelas" required value={editForm.code} onChange={setEditField("code")}
+                    placeholder="cth: JK-A1" />
+                  {editErrors.code && <p style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{editErrors.code}</p>}
+                </div>
+                <div>
+                  <Field label="Semester" required value={editForm.semester} onChange={setEditField("semester")}
+                    placeholder="cth: Genap 2025/2026" />
+                  {editErrors.semester && <p style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{editErrors.semester}</p>}
+                </div>
+              </div>
+
+              <div>
+                <Field label="Nama Dosen" required value={editForm.lecturer} onChange={setEditField("lecturer")}
+                  placeholder="cth: Dr. Alex Rivera" />
+                {editErrors.lecturer && <p style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{editErrors.lecturer}</p>}
+              </div>
+
+              <div>
+                <Field label="Lokasi Lab" required value={editForm.location} onChange={setEditField("location")}
+                  placeholder="cth: Lab Komputer A, Gedung 4" />
+                {editErrors.location && <p style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{editErrors.location}</p>}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <Field label="Jumlah Sesi" required type="number" value={editForm.total_sessions_planned}
+                    onChange={setEditField("total_sessions_planned")} placeholder="cth: 14"
+                    hint="Penyebut perhitungan % kehadiran" />
+                  {editErrors.total_sessions_planned && <p style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{editErrors.total_sessions_planned}</p>}
+                </div>
+                <div>
+                  <Field label="Min Kehadiran %" required type="number" value={editForm.min_attendance_pct}
+                    onChange={setEditField("min_attendance_pct")} placeholder="cth: 75"
+                    hint="Batas lulus (1–100)" />
+                  {editErrors.min_attendance_pct && <p style={{ fontSize: 11, color: "#f87171", marginTop: 3 }}>{editErrors.min_attendance_pct}</p>}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowEditModal(false)}
+                style={{ padding: "9px 18px", borderRadius: 10, background: "none", border: "1px solid rgba(110,231,183,0.2)", color: "rgba(110,231,183,0.6)", fontSize: 13, cursor: "pointer" }}>
+                Batal
+              </button>
+              <button onClick={handleEditSubmit} disabled={editSubmitting}
+                style={{ padding: "9px 22px", borderRadius: 10, background: "linear-gradient(135deg,rgba(16,185,129,0.35),rgba(16,185,129,0.2))", border: "1px solid rgba(16,185,129,0.35)", color: "#34D399", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: editSubmitting ? 0.6 : 1 }}>
+                {editSubmitting ? "Menyimpan..." : <><Pencil size={13} style={{ marginRight: 6, display: "inline", verticalAlign: "middle" }} />Simpan Perubahan</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Konfirmasi Hapus ────────────────────────────────────────────*/}
+      {showDeleteModal && deletingClass && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1000,
+          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 16,
+        }}>
+          <div
+            ref={deleteModalRef}
+            className="glass rounded-2xl"
+            style={{
+              width: "100%", maxWidth: 440,
+              padding: "28px 28px 24px",
+              border: "1px solid rgba(248,113,113,0.2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Trash2 size={18} style={{ color: "#f87171" }} />
+              </div>
+              <div>
+                <h2 style={{ color: "#f0fdf4", fontSize: 17, fontWeight: 700, margin: 0 }}>Hapus Kelas?</h2>
+                <p style={{ color: "rgba(110,231,183,0.45)", fontSize: 12, margin: 0 }}>Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p style={{ color: "rgba(240,253,244,0.75)", fontSize: 14, marginBottom: 6, lineHeight: 1.6 }}>
+              Kelas <strong style={{ color: "#f0fdf4" }}>{deletingClass.name}</strong>
+              {" "}(<span style={{ color: "#34D399" }}>{deletingClass.code}</span>) beserta seluruh sesi dan data kehadiran terkait akan dihapus permanen.
+            </p>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+              <button onClick={() => setShowDeleteModal(false)}
+                style={{ padding: "9px 18px", borderRadius: 10, background: "none", border: "1px solid rgba(110,231,183,0.2)", color: "rgba(110,231,183,0.6)", fontSize: 13, cursor: "pointer" }}>
+                Batal
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                style={{ padding: "9px 22px", borderRadius: 10, background: "linear-gradient(135deg,rgba(248,113,113,0.3),rgba(248,113,113,0.15))", border: "1px solid rgba(248,113,113,0.35)", color: "#f87171", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? "Menghapus..." : <><Trash2 size={13} style={{ marginRight: 6, display: "inline", verticalAlign: "middle" }} />Hapus Kelas</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @media (max-width: 900px) { .kelas-stat-grid { grid-template-columns: repeat(2,1fr) !important; } }
         input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
         input:focus { border-color: rgba(16,185,129,0.5) !important; box-shadow: 0 0 0 2px rgba(16,185,129,0.08); }
+        .kelas-card-link:hover + div button, .kelas-card-link:hover { opacity: 1; }
       `}</style>
     </div>
   );
